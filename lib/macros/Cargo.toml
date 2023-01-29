@@ -1,0 +1,16 @@
+[package]
+name        = "nusion-macros"
+description = "Macros to accompany nusion crate."
+authors     = ["Sinisig"]
+version     = "0.0.1+alpha"
+edition     = "2021"
+
+[lib]
+proc-macro = true
+
+[target.'cfg(windows)'.dependencies.winapi]
+version  = "0.3.9"
+features = [
+   # Place features in here!
+]
+

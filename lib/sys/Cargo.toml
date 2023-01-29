@@ -1,0 +1,13 @@
+[package]
+name        = "nusion-sys"
+description = "System abstractions used by nusion."
+authors     = ["Sinisig"]
+version     = "0.0.1+alpha"
+edition     = "2021"
+
+[target.'cfg(windows)'.dependencies.winapi]
+version  = "0.3.9"
+features = [
+   # Place features in here!
+]
+

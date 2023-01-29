@@ -3,7 +3,16 @@
 version = 3
 
 [[package]]
-name = "drg"
+name = "nusion"
+version = "0.0.1+alpha"
+dependencies = [
+ "nusion-macros",
+ "nusion-sys",
+ "winapi",
+]
+
+[[package]]
+name = "nusion-game-drg"
 version = "0.0.1+alpha"
 dependencies = [
  "nusion",
@@ -11,7 +20,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "nusion"
+name = "nusion-macros"
+version = "0.0.1+alpha"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
+name = "nusion-sys"
 version = "0.0.1+alpha"
 dependencies = [
  "winapi",

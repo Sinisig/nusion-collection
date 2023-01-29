@@ -5,6 +5,10 @@ authors     = ["Sinisig"]
 version     = "0.0.1+alpha"
 edition     = "2021"
 
+[dependencies]
+nusion-macros  = { path = "../macros"  }
+nusion-sys     = { path = "../sys"     }
+
 [target.'cfg(windows)'.dependencies.winapi]
 version  = "0.3.9"
 features = [
