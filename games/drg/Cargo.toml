@@ -1,0 +1,19 @@
+[package]
+name        = "drg"
+description = "Nusion modding API for Deep Rock Galactic."
+authors     = ["Sinisig"]
+version     = "0.0.1+alpha"
+edition     = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nusion = { path = "../../lib" }
+
+[dependencies.winapi]
+version  = "0.3.9"
+features = [
+   # Add features here!
+]
+

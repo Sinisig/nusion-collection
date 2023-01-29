@@ -1,0 +1,6 @@
+[workspace]
+members = [
+   "lib/",     # Main modding library crate
+   "games/*"   # Game-specific framework implementations
+]
+
