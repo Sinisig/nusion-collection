@@ -10,7 +10,7 @@
 
 
 // Public re-exports
-
+pub use nusion_sys_macros::*;
 
 // Unit tests
 #[cfg(tests)]

@@ -8,7 +8,6 @@ version = "0.0.1+alpha"
 dependencies = [
  "nusion-macros",
  "nusion-sys",
- "winapi",
 ]
 
 [[package]]
@@ -16,18 +15,22 @@ name = "nusion-game-drg"
 version = "0.0.1+alpha"
 dependencies = [
  "nusion",
- "winapi",
 ]
 
 [[package]]
 name = "nusion-macros"
 version = "0.0.1+alpha"
+
+[[package]]
+name = "nusion-sys"
+version = "0.0.1+alpha"
 dependencies = [
+ "nusion-sys-macros",
  "winapi",
 ]
 
 [[package]]
-name = "nusion-sys"
+name = "nusion-sys-macros"
 version = "0.0.1+alpha"
 dependencies = [
  "winapi",
