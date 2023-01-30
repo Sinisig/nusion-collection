@@ -2,8 +2,8 @@
 //! of macros which are incorporated into nusion-sys.
 //!
 //! It is not recommended to use this crate directly,
-//! but instead use the nusion-sys crate to gain access
-//! to re-exports of the macros.
+//! but instead use the safe(r) macros in nusion-macros
+//! which are incorporated into nusion.
 
 // Public modules
 
