@@ -1,5 +1,5 @@
-# Nusion
-A work-in-progress general-purpose game modding library and ecosystem.
+# Nusion Project
+A work-in-progress general-purpose game modding ecosystem.
 
 ### Project Layout
 Each submodule has their own readme.  For more information, read their individual readme and generated cargo documentation.
@@ -7,11 +7,14 @@ Each submodule has their own readme.  For more information, read their individua
 #### nusion
 Main game modding library/framework
 #### nusion-sys
-System abstractions used by nusion
-<i>This should not be used directly as a dependency</i>
+System abstractions used by nusion.
+<b>This should not be used directly as a dependency</b>
 #### nusion-macros
-Macro implementations incorporated into nusion
-<i>This should not be used directly as a dependency</i>
+Macro implementations incorporated into nusion.
+<b>This should not be used directly as a dependency</b>
+#### nusion-sys-macros
+System abstraction macros used by nusion-macros.
+<b>This should not be used directly as a dependency</b>
 
 ### Build Requirements
  - A Linux installation
@@ -44,7 +47,24 @@ Macro implementations incorporated into nusion
  - The output binaries will be under 'target/[target-platform]/release/'
 
 ### About
-This started off as an adaptation of a cheat client I made for Deep Rock Galactic called 'Fusion' for the Rust programming language.  I was curious how viable Rust was for game hacking considering all the compile-time and run-time safety checks.  Eventually this would evolve to become a standalone general-purpose modding utility aimed at video games, but can theoretically be used for any native executable.  This switch in direction and branding was done for two reasons.  The first reason is to more accurately reflect the potential for this repository.  It's not meant exclusively for cheating in video games; it can be used for many other purposes.  The second reason is to prevent showing up in search results for skids trying to find cheats for online games and cause mayhem.  I don't want to be the one enabling griefers to go and ruin online games.  I understand this library makes the lives of these people easier as this library takes care of much of the mess and low-level knowledge of game hacking, but actual hackers would just do it themselves anyways.  It slightly lowers the barrier of entry for cheaters while providing a modding suite for all Rustaceans.  I believe this is a worthy tradeoff.
+This started off as an adaptation of a cheat client I made for
+Deep Rock Galactic called 'Fusion' for the Rust programming language.
+I was curious how viable Rust was for game hacking considering all the
+compile-time and run-time safety checks.  Eventually this would evolve
+to become a standalone general-purpose modding utility aimed at video
+games, but can theoretically be used for any native executable.  This
+switch in direction and branding was done for two reasons.  The first
+reason is to more accurately reflect the potential for this repository.
+It's not meant exclusively for cheating in video games; it can be used
+for many other purposes.  The second reason is to prevent showing up in
+search results for skids trying to find cheats for online games and
+cause mayhem.  I don't want to be the one enabling griefers to go and
+ruin online games.  I understand this library makes the lives of these
+people easier as this library takes care of much of the mess and low-level
+knowledge of game hacking, but actual hackers would just do it themselves
+anyways.  It slightly lowers the barrier of entry for cheaters while
+providing a modding suite for all Rustaceans.  I believe this is a worthy
+tradeoff.
 
 ### Timeline
  * January 29th, 2023 - Development started by Sinisig
