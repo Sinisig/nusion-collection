@@ -5,6 +5,6 @@ members = [
    "lib/sys",        # System abstractions used by nusion
    "lib/sys-macros", # System macros incorporated publically into nusion-sys
 
-   "games/*"         # Game-specific framework implementations
+   "game/*"          # Game-specific framework implementations
 ]
 
