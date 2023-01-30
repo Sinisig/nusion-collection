@@ -7,7 +7,11 @@
 //! wrappers found in nusion.
 
 // Public modules
+pub mod mem;
 
+// Internal modules
+mod os;
+mod cpu;
 
 // Unit tests
 #[cfg(tests)]
