@@ -20,12 +20,14 @@ dependencies = [
 [[package]]
 name = "nusion-macros"
 version = "0.0.1+alpha"
+dependencies = [
+ "nusion-sys-macros",
+]
 
 [[package]]
 name = "nusion-sys"
 version = "0.0.1+alpha"
 dependencies = [
- "nusion-sys-macros",
  "winapi",
 ]
 
