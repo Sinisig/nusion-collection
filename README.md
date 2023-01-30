@@ -10,7 +10,10 @@ information, view the documentation contained inside each
 crate's directory.
 
 #### nusion
-Main game modding library/framework
+Main game modding library/framework.  All utility functions
+for patching memory, hooking functions, enumerating processes,
+getting base addresses, and more are found in here as high-level
+(relatively) safe abstractions.
 
 #### nusion-sys
 System abstractions used by nusion.
