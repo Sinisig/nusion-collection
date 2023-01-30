@@ -1,24 +1,42 @@
-# Nusion Project
-A work-in-progress general-purpose game modding ecosystem.
+# Nusion Collection
+A work-in-progress collection of libraries, frameworks, and tools
+for creating game modifications and modding frameworks.
+
+
 
 ### Project Layout
-Each submodule has their own readme.  For more information, read their individual readme and generated cargo documentation.
+Each crate has their own readme and documentation.  For more
+information, view the documentation contained inside each
+crate's directory.
 
 #### nusion
 Main game modding library/framework
+
 #### nusion-sys
 System abstractions used by nusion.
-<b>This should not be used directly as a dependency</b>
+<b>This should never be used directly as a dependency.</b>
+Instead, you should use the safe(r) high-level wrappers
+found in the nusion library crate.
+
 #### nusion-macros
 Macro implementations incorporated into nusion.
-<b>This should not be used directly as a dependency</b>
+<b>This should not be used directly as a dependency.</b>
+Instead, you should use the nusion crate, which includes
+this crate bundled with it.
+
 #### nusion-sys-macros
 System abstraction macros used by nusion-macros.
-<b>This should not be used directly as a dependency</b>
+<b>This should never be used directly as a dependency.</b>
+Instead, you should use the safe(r) macros found in
+nusion-macros.
+
+
 
 ### Build Requirements
  - A Linux installation
  - [Rustup](https://rustup.rs/)
+
+
 
 ### Building
 #### Windows
@@ -46,6 +64,8 @@ System abstraction macros used by nusion-macros.
  ```
  - The output binaries will be under 'target/[target-platform]/release/'
 
+
+
 ### About
 This started off as an adaptation of a cheat client I made for
 Deep Rock Galactic called 'Fusion' for the Rust programming language.
@@ -65,6 +85,8 @@ knowledge of game hacking, but actual hackers would just do it themselves
 anyways.  It slightly lowers the barrier of entry for cheaters while
 providing a modding suite for all Rustaceans.  I believe this is a worthy
 tradeoff.
+
+
 
 ### Timeline
  * January 29th, 2023 - Development started by Sinisig
