@@ -21,6 +21,7 @@ pub struct MemoryError {
 #[derive(Debug)]
 pub enum MemoryErrorKind {
    PermissionDenied,
+   InvalidAddressRange,
    UnmappedAddress,
    Unknown,
 }
@@ -109,6 +110,8 @@ impl std::fmt::Display for MemoryErrorKind {
       return write!(stream, "{}", match self {
          Self::PermissionDenied
             => "Permission denied",
+         Self::InvalidAddressRange
+            => "Invalid address range",
          Self::UnmappedAddress
             => "Address not mapped",
          Self::Unknown
