@@ -36,10 +36,25 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// Drop
 /// </a>
 /// trait.
+///
+/// <h2 id=  patch_note>
+/// <a href=#patch_note>
+/// Note
+/// </a></h2>
+///
+/// Since the patch uses the Drop trait
+/// to automatically clean up memory, a
+/// Patch instance must have a real variable
+/// binding to prevent going out of scope
+/// and calling Drop too early.  This can
+/// be accomplished by assigning a Patch
+/// to a named variable.
+///
 /// <h2 id=  patch_safety>
 /// <a href=#patch_safety>
 /// Safety
 /// </a></h2>
+///
 /// Every function to create a patch
 /// requires quite a bit of care and
 /// attention to prevent catastrophic
@@ -131,7 +146,7 @@ impl Patch {
    /// </a></h2>
    /// See <a href=#patch_safety>Self</a>
    /// for safety concerns.
-   pub unsafe fn patch_with<F>(
+   pub unsafe fn with<F>(
       address_range  : std::ops::Range<* const c_void>,
       build_patch    : F,
    ) -> Result<Self>
