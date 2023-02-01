@@ -216,7 +216,10 @@ impl MemoryEditor {
    /// In addition, since the data was created
    /// from raw pointers, the data may change
    /// in unexpected ways and lead to undefined
-   /// behavior.
+   /// behavior.  Also, trying to use a generic
+   /// value which has no size will panic in
+   /// debug builds and lead to undefined behavior
+   /// in release builds.
    pub unsafe fn data<'l, T>(
       &'l self,
    ) -> &'l [T] {

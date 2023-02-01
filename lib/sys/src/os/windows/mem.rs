@@ -87,7 +87,7 @@ impl MemoryPermissions {
          // TODO: Error code parsing
          _           => Unknown,
       };
-      
+
       // Create the MemoryError and return
       return Err(crate::mem::MemoryError::new(
          errkind, address_range.clone(),
