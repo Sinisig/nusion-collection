@@ -146,7 +146,7 @@ impl Patch {
    /// </a></h2>
    /// See <a href=#patch_safety>Self</a>
    /// for safety concerns.
-   pub unsafe fn with<F>(
+   pub unsafe fn new<F>(
       address_range  : std::ops::Range<* const c_void>,
       build_patch    : F,
    ) -> Result<Self>
