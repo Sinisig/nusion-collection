@@ -2,9 +2,9 @@
 //! modding framework and utilities crate.
 
 // Public modules
+pub mod patch;
 
-
-// Public re-exports
+// Macro crate re-exports
 pub use nusion_macros::*;
 
 // Unit tests
