@@ -103,7 +103,7 @@ impl Drop for Patch {
          self.location.clone(),
       ).expect(
          "Failed to restore patched bytes",
-      ).bytes_mut()}.clone_from_slice(&self.old_bytes);
+      ).bytes_mut()}.copy_from_slice(&self.old_bytes);
 
       return;
    }
