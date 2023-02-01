@@ -67,8 +67,8 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// doesn't come with any warranty of any
 /// kind, so don't hold me accountable!
 pub struct Patch {
-   location    : std::ops::Range<* const c_void>,
-   old_bytes   : Vec<u8>,
+   address_range  : std::ops::Range<* const c_void>,
+   old_bytes      : Vec<u8>,
 }
 
 //////////////////////////
@@ -118,7 +118,37 @@ impl From<sys::mem::MemoryError> for PatchError {
 /////////////////////
 
 impl Patch {
-      
+   /// Creates a patch using a user-defined
+   /// closure to write new byte values to
+   /// the memory region.  The closure will
+   /// only be executed after the memory region
+   /// has been successfully opened for reading
+   /// and writing and a backup of the pre-patch
+   /// bytes has been made.
+   /// <h2 id=  patch_patch_with_safety>
+   /// <a href=#patch_patch_with_safety>
+   /// Safety
+   /// </a></h2>
+   /// See <a href=#patch_safety>Self</a>
+   /// for safety concerns.
+   pub unsafe fn patch_with<F>(
+      address_range  : std::ops::Range<* const c_void>,
+      build_patch    : F,
+   ) -> Result<Self>
+   where F: FnOnce(& mut [u8]) -> Result<()> {
+      let mut editor = sys::mem::MemoryEditor::open_read_write(
+         address_range.clone(),
+      )?;
+
+      let old_bytes = editor.bytes().to_vec();
+
+      build_patch(editor.bytes_mut())?;
+
+      return Ok(Self{
+         address_range  : address_range,
+         old_bytes      : old_bytes,
+      });
+   }
 }
 
 ///////////////////////////////////
@@ -130,7 +160,7 @@ impl Drop for Patch {
       & mut self,
    ) {
       unsafe{sys::mem::MemoryEditor::open_read_write(
-         self.location.clone(),
+         self.address_range.clone(),
       ).expect(
          "Failed to restore patched bytes",
       ).bytes_mut()}.copy_from_slice(&self.old_bytes);
