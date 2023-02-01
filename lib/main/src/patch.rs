@@ -36,6 +36,36 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// Drop
 /// </a>
 /// trait.
+/// <h2 id=  patch_safety>
+/// <a href=#patch_safety>
+/// Safety
+/// </a></h2>
+/// Every function to create a patch
+/// requires quite a bit of care and
+/// attention to prevent catastrophic
+/// memory safety errors and crashes
+/// from regularly occurring due to the
+/// nature of overwriting arbitrary
+/// memory locations with unrelated
+/// byte data.  First, all safety concerns
+/// from nusion_sys::mem::MemoryEditor::data_mut()
+/// apply to every function to create a
+/// patch.  Second, the patch data must
+/// be valid for the context.  For example,
+/// you should never overwrite machine code
+/// with unrelated data.  It should only
+/// be overwrote with machine code which
+/// is valid for the surrounding code.
+/// Some function variants are safer
+/// (with an 'R') than others, such as
+/// those which take a checksum to compare
+/// against.  While they are safer, they
+/// are still wildly unsafe.  This is the
+/// Mariana Trench of undefined behavior,
+/// so make sure to use this module when
+/// sober and well-rested.  This library
+/// doesn't come with any warranty of any
+/// kind, so don't hold me accountable!
 pub struct Patch {
    location    : std::ops::Range<* const c_void>,
    old_bytes   : Vec<u8>,
@@ -88,7 +118,7 @@ impl From<sys::mem::MemoryError> for PatchError {
 /////////////////////
 
 impl Patch {
-
+      
 }
 
 ///////////////////////////////////
