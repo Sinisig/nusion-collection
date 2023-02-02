@@ -177,14 +177,14 @@ impl Patch {
          address_range.clone(),
       )?;
 
-      let old_bytes = editor.bytes().to_vec();
+      let patch = Self{
+         address_range  : address_range,
+         old_bytes      : editor.bytes().to_vec(),
+      };
 
       build_patch(editor.bytes_mut())?;
 
-      return Ok(Self{
-         address_range  : address_range,
-         old_bytes      : old_bytes,
-      });
+      return Ok(patch);
    }
 
    /// Creates a patch by overwriting
