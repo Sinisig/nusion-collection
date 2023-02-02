@@ -97,7 +97,8 @@ pub struct Patch {
 //////////////////////////
 
 impl PatchError {
-   /// 
+   /// Creates a new PatchError from
+   /// a given PatchErrorKind.
    pub fn new(
       kind : PatchErrorKind,
    ) -> Self {
@@ -106,7 +107,8 @@ impl PatchError {
       };
    }
 
-   /// 
+   /// Returns a reference to the
+   /// stored PatchErrorKind.
    pub fn kind<'l>(
       &'l self,
    ) -> &'l PatchErrorKind {
@@ -126,9 +128,9 @@ impl std::fmt::Display for PatchError {
       use PatchErrorKind::*;
       return match self.kind() {
          MemoryError    {sys_error,       }
-            => write!(stream, "Memory error: {sys_error}"),
+            => write!(stream, "Memory error: {sys_error}",                          ),
          LengthMismatch {found, expected, }
-            => write!(stream, "Length mismatch: Found {found}, expected {expected}"),
+            => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
       };
    }
 }
@@ -185,7 +187,12 @@ impl Patch {
       });
    }
 
-   /// (Documentation)
+   /// Creates a patch by overwriting
+   /// the target memory address with
+   /// bytes from a byte slice.  If the
+   /// length of the byte slice differs
+   /// from the length of the address
+   /// range, an error is returned.
    ///
    /// <h2 id=  patch_patch_safety>
    /// <a href=#patch_patch_safety>
