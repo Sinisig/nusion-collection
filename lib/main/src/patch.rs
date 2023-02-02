@@ -255,7 +255,8 @@ impl PatchAlignment {
       value    : T,
    ) -> Result<& Self>
    where T: Clone,
-         U: Clone, {
+         U: Clone,
+   {
       let (
          pad_count_left,
          pad_count_right,
@@ -346,12 +347,15 @@ impl Patch {
       return Ok(patch);
    }
 
-   /// Creates a patch by overwriting
-   /// the target memory address with
-   /// bytes from a byte slice.  If the
-   /// length of the byte slice differs
-   /// from the length of the address
-   /// range, an error is returned.
+   /// Creates a patch by writing a
+   /// slice of arbitrary elements
+   /// using a byte alignment and
+   /// padding out unfilled data
+   /// with a specified padding value.
+   /// If the slice data is too long
+   /// or there are residual bytes
+   /// left over in the padding,
+   /// an error will be returned.
    ///
    /// <h2 id=  patch_patch_safety>
    /// <a href=#patch_patch_safety>
@@ -359,21 +363,19 @@ impl Patch {
    /// </a></h2>
    /// See <a href=#patch_safety>Self</a>
    /// for safety concerns.
-   pub unsafe fn patch(
+   pub unsafe fn fill_with_padding<T, U>(
       address_range  : std::ops::Range<* const c_void>,
-      new_bytes      : & [u8],
-   ) -> Result<Self> {
-      let target_length = address_range.end.offset_from(address_range.start) as usize;
-      
-      if new_bytes.len() != target_length {
-         return Err(PatchError::new(PatchErrorKind::LengthMismatch{
-            found    : new_bytes.len(),
-            expected : target_length,
-         }));
-      }
-
+      slice          : & [T],
+      padding        : U,
+      alignment      : PatchAlignment,
+   ) -> Result<Self>
+   where T: Clone,
+         U: Clone, 
+   {
       return Self::new(address_range, |target| {
-         target.copy_from_slice(new_bytes);
+         alignment.clone_from_slice_with_padding(
+            target, slice, padding,
+         )?;
          Ok(())
       });
    }
