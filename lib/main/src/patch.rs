@@ -214,7 +214,8 @@ impl Patch {
       }
 
       return Self::new(address_range, |target| {
-         Ok(target.copy_from_slice(new_bytes))
+         target.copy_from_slice(new_bytes);
+         Ok(())
       });
    }
 }
