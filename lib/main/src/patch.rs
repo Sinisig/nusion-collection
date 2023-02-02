@@ -19,7 +19,13 @@ pub struct PatchError {
 /// behind a PatchError.
 #[derive(Debug)]
 pub enum PatchErrorKind {
-   MemoryError(sys::mem::MemoryError),
+   MemoryError{
+      sys_error   : sys::mem::MemoryError
+   },
+   LengthMismatch{
+      found       : usize,
+      expected    : usize,
+   },
 }
 
 /// A result type returned by patch
@@ -91,6 +97,16 @@ pub struct Patch {
 //////////////////////////
 
 impl PatchError {
+   /// 
+   pub fn new(
+      kind : PatchErrorKind,
+   ) -> Self {
+      return Self{
+         kind : kind,
+      };
+   }
+
+   /// 
    pub fn kind<'l>(
       &'l self,
    ) -> &'l PatchErrorKind {
@@ -109,8 +125,10 @@ impl std::fmt::Display for PatchError {
    ) -> std::fmt::Result {
       use PatchErrorKind::*;
       return match self.kind() {
-         MemoryError(err)
-            => write!(stream, "Memory error: {err}"),
+         MemoryError    {sys_error,       }
+            => write!(stream, "Memory error: {sys_error}"),
+         LengthMismatch {found, expected, }
+            => write!(stream, "Length mismatch: Found {found}, expected {expected}"),
       };
    }
 }
@@ -122,9 +140,9 @@ impl From<sys::mem::MemoryError> for PatchError {
    fn from(
       value : sys::mem::MemoryError
    ) -> Self {
-      return Self{
-         kind: PatchErrorKind::MemoryError(value),
-      };
+      return Self::new(PatchErrorKind::MemoryError{
+         sys_error : value,
+      });
    }
 }
 
@@ -135,13 +153,15 @@ impl From<sys::mem::MemoryError> for PatchError {
 impl Patch {
    /// Creates a patch using a user-defined
    /// closure to write new byte values to
-   /// the memory region.  The closure will
+   /// the memory region.  The closure parameter
+   /// is a mutable byte slice for the memory
+   /// region of the patch.  The closure will
    /// only be executed after the memory region
    /// has been successfully opened for reading
    /// and writing and a backup of the pre-patch
    /// bytes has been made.
-   /// <h2 id=  patch_patch_with_safety>
-   /// <a href=#patch_patch_with_safety>
+   /// <h2 id=  patch_new_safety>
+   /// <a href=#patch_new_safety>
    /// Safety
    /// </a></h2>
    /// See <a href=#patch_safety>Self</a>
@@ -162,6 +182,32 @@ impl Patch {
       return Ok(Self{
          address_range  : address_range,
          old_bytes      : old_bytes,
+      });
+   }
+
+   /// (Documentation)
+   ///
+   /// <h2 id=  patch_patch_safety>
+   /// <a href=#patch_patch_safety>
+   /// Safety
+   /// </a></h2>
+   /// See <a href=#patch_safety>Self</a>
+   /// for safety concerns.
+   pub unsafe fn patch(
+      address_range  : std::ops::Range<* const c_void>,
+      new_bytes      : & [u8],
+   ) -> Result<Self> {
+      let target_length = address_range.end.offset_from(address_range.start) as usize;
+      
+      if target_length != new_bytes.len() {
+         return Err(PatchError::new(PatchErrorKind::LengthMismatch{
+            found    : new_bytes.len(),
+            expected : target_length,
+         }));
+      }
+
+      return Self::new(address_range, |target| {
+         Ok(target.copy_from_slice(new_bytes))
       });
    }
 }
