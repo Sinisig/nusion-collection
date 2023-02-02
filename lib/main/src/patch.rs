@@ -26,6 +26,10 @@ pub enum PatchErrorKind {
       found       : usize,
       expected    : usize,
    },
+   ResidualBytes{
+      left        : usize,
+      right       : usize,
+   },
 }
 
 /// A result type returned by patch
@@ -92,6 +96,30 @@ pub struct Patch {
    old_bytes      : Vec<u8>,
 }
 
+/// Enum for representing alignment
+/// of data within a section of memory.
+/// This is useful for specifying where
+/// a byte slice should be positioned
+/// within a larger section of memory.
+#[derive(Debug)]
+pub enum PatchAlignment {
+   Left,
+   LeftOffset{
+      elements : usize,
+   },
+   LeftByteOffset{
+      bytes    : usize,
+   },
+   Right,
+   RightOffset{
+      elements : usize,
+   },
+   RightByteOffset{
+      bytes    : usize,
+   },
+   Center,
+}
+
 //////////////////////////
 // METHODS - PatchError //
 //////////////////////////
@@ -131,6 +159,8 @@ impl std::fmt::Display for PatchError {
             => write!(stream, "Memory error: {sys_error}",                          ),
          LengthMismatch {found, expected, }
             => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
+         ResidualBytes  {left, right,     }
+            => write!(stream, "Residual bytes: {left} on left, {right} on right"),
       };
    }
 }
@@ -145,6 +175,135 @@ impl From<sys::mem::MemoryError> for PatchError {
       return Self::new(PatchErrorKind::MemoryError{
          sys_error : value,
       });
+   }
+}
+
+//////////////////////////////
+// METHODS - PatchAlignment //
+//////////////////////////////
+
+impl PatchAlignment {
+   /// Returns the amount of left
+   /// and right padding to insert
+   /// given a buffer byte count
+   /// and insert data byte count.
+   /// The returned tuple is the
+   /// amount of <b>elements</b>
+   /// to be inserted before and
+   /// after the source respectively.
+   /// If there are an uneven number
+   /// of bytes on either side or
+   /// a byte offset count too large
+   /// is passed in, an error is
+   /// returned.
+   pub fn padding_count<T>(
+      & self,
+      buffer_byte_count : usize,
+      insert_byte_count : usize,
+   ) -> Result<(usize, usize)> {
+      if buffer_byte_count < insert_byte_count {
+         return Err(PatchError::new(PatchErrorKind::LengthMismatch{
+            found    : insert_byte_count,
+            expected : buffer_byte_count,
+         }));
+      }
+
+      let byte_pad_count   = buffer_byte_count - insert_byte_count;
+      let element_size     = std::mem::size_of::<T>();
+
+      let bytes_pad_left   = match self {
+         Self::Left
+            => 0,
+         Self::LeftOffset        {elements}
+            => *elements * element_size,
+         Self::LeftByteOffset    {bytes   }
+            => *bytes,
+         Self::Right
+            => byte_pad_count,
+         Self::RightOffset       {elements}
+            => byte_pad_count - *elements * element_size,
+         Self::RightByteOffset   {bytes   }
+            => byte_pad_count - *bytes,
+         Self::Center
+            => element_size * ((byte_pad_count / 2) / element_size),
+      };
+      let bytes_pad_right  = byte_pad_count - bytes_pad_left;
+
+      let bytes_residual_left    = bytes_pad_left  % element_size;
+      let bytes_residual_right   = bytes_pad_right % element_size;
+      if bytes_residual_left != 0 || bytes_residual_right != 0 {
+         return Err(PatchError::new(PatchErrorKind::ResidualBytes{
+            left  : bytes_residual_left,
+            right : bytes_residual_right,
+         }));
+      }
+
+      let elements_left    = bytes_pad_left  / element_size;
+      let elements_right   = bytes_pad_right / element_size;
+
+      return Ok((elements_left, elements_right));
+   }
+
+   /// Fills a byte array with a
+   /// slice type surrounded by
+   /// padding values using the
+   /// given alignment.
+   pub fn clone_from_slice_with_padding<T, U>(
+      & self,
+      buffer   : & mut [u8],
+      slice    : & [U],
+      value    : T,
+   ) -> Result<& Self>
+   where T: Clone,
+         U: Clone, {
+      let (
+         pad_count_left,
+         pad_count_right,
+      ) = self.padding_count::<T>(
+         buffer.len(),
+         slice.len(),
+      )?;
+
+      let size_of_t        = std::mem::size_of::<T>();
+      let size_of_u        = std::mem::size_of::<U>();
+      let byte_end_left    = pad_count_left * size_of_t;
+      let byte_end_slice   = byte_end_left + (slice.len() * size_of_u);
+
+      // Fill left padding
+      unsafe{std::slice::from_raw_parts_mut(
+         buffer[
+            0..byte_end_left
+         ].as_ptr() as * mut T,
+         pad_count_left,
+      )}.fill(value.clone());
+
+      // Copy slice
+      unsafe{std::slice::from_raw_parts_mut(
+         buffer[
+            byte_end_left..byte_end_slice
+         ].as_ptr() as * mut U,
+         slice.len(),
+      )}.clone_from_slice(slice);
+
+      // Fill right padding
+      unsafe{std::slice::from_raw_parts_mut(
+         buffer[
+            byte_end_slice..
+         ].as_ptr() as * mut T,
+         pad_count_right,
+      )}.fill(value.clone());
+
+      return Ok(self);
+   }
+}
+
+////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - PatchAlignment //
+////////////////////////////////////////////
+
+impl Default for PatchAlignment {
+   fn default() -> Self {
+      return Self::Center;
    }
 }
 
@@ -206,7 +365,7 @@ impl Patch {
    ) -> Result<Self> {
       let target_length = address_range.end.offset_from(address_range.start) as usize;
       
-      if target_length != new_bytes.len() {
+      if new_bytes.len() != target_length {
          return Err(PatchError::new(PatchErrorKind::LengthMismatch{
             found    : new_bytes.len(),
             expected : target_length,
@@ -218,6 +377,8 @@ impl Patch {
          Ok(())
       });
    }
+
+   
 }
 
 ///////////////////////////////////
