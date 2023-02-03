@@ -1,12 +1,10 @@
 [package]
-name        = "nusion-macros"
-description = "Macros to accompany nusion crate."
+name        = "nusion-proc-macros"
+description = "Procedural macros to be included with nusion"
 authors     = ["Sinisig"]
 version     = "0.0.1+alpha"
 edition     = "2021"
 
 [lib]
 proc-macro = true
-
-[dependencies]
 

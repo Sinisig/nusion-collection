@@ -3,9 +3,10 @@
 
 // Public modules
 pub mod patch;
+pub mod macros;
 
-// Macro crate re-exports
-pub use nusion_macros::*;
+// Public re-exports
+pub use nusion_proc_macros::*;
 
 // Unit tests
 #[cfg(tests)]

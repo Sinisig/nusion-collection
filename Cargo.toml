@@ -1,8 +1,8 @@
 [workspace]
 members = [
-   "lib/main",    # Main modding library crate
-   "lib/macros",  # Macros incorporated publically into nusion
-   "lib/sys",     # System abstractions used by nusion
+   "lib/main", # Main modding library crate
+   "lib/proc", # Procedural macros incorporated into nusion
+   "lib/sys",  # System abstractions used by nusion
 
    "game/*"       # Game-specific framework implementations
 ]

@@ -6,7 +6,7 @@ version = 3
 name = "nusion"
 version = "0.0.1+alpha"
 dependencies = [
- "nusion-macros",
+ "nusion-proc-macros",
  "nusion-sys",
 ]
 
@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nusion-macros"
+name = "nusion-proc-macros"
 version = "0.0.1+alpha"
 
 [[package]]

@@ -21,8 +21,8 @@ System abstractions used by nusion.
 Instead, you should use the safe(r) high-level wrappers
 found in the nusion library crate.
 
-#### nusion-macros
-Macro implementations incorporated into nusion.
+#### nusion-proc-macros
+Procedural macro implementations incorporated into nusion.
 <b>This should not be used directly as a dependency.</b>
 Instead, you should use the nusion crate, which includes
 this crate bundled with it.

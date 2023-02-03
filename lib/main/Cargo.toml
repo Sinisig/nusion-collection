@@ -6,6 +6,6 @@ version     = "0.0.1+alpha"
 edition     = "2021"
 
 [dependencies]
-nusion-macros  = { path = "../macros"  }
-nusion-sys     = { path = "../sys"     }
+nusion-proc-macros   = { path = "../proc" }
+nusion-sys           = { path = "../sys"  }
 
