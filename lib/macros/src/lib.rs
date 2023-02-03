@@ -7,8 +7,6 @@
 
 extern crate proc_macro;
 
-use nusion_sys_macros as sys;
-
 /// Attribute macro which defines
 /// an entry point in a dynamic
 /// library.  This entrypoint will
@@ -28,11 +26,21 @@ use nusion_sys_macros as sys;
 /// Box<dyn std::error::Error>.
 #[proc_macro_attribute]
 pub fn entry(
-   attr  : proc_macro::TokenStream,
+   _     : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-   // TODO: Implement
-   return item;
+   todo!();
+
+   // Get the identifier for the function
+   let identifier = "DUMMY";
+
+   // Insert the framework macro call
+   // and return the formatted code
+   return format!(r"
+      nusion::framework::entry!({identifier})
+
+      {item}
+   ").parse().unwrap();
 }
 
 // Unit tests
