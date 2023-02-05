@@ -9,8 +9,23 @@
 /// the chosen initialization function.
 #[macro_export]
 macro_rules! build_slib_entry {
-   ($entry:ident, $init:ident) => {
-      nusion::sys::build_slib_entry_os!($entry, $init);
-   }
+   ($entry:ident, default)    => {
+      nusion::sys::build_slib_entry_os!(
+         $entry,
+         run_main_default
+      );
+   };
+   ($entry:ident, result_st)  => {
+      nusion::sys::build_slib_entry_os!(
+         $entry,
+         run_main_result_static
+      );
+   };
+   ($entry:ident, result_dy)  => {
+      nusion::sys::build_slib_entry_os!(
+         $entry,
+         run_main_result_dynamic
+      );
+   };
 }
 

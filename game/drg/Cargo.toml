@@ -9,5 +9,5 @@ edition     = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-nusion   = { path = "../../lib/main" }
+nusion = { path = "../../lib/main" }
 

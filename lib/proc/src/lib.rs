@@ -47,7 +47,7 @@ pub fn entry(
    // Choose initialization type based on return type
    let init_type = if let syn::ReturnType::Type(_, ty) = signature.output {
       // TODO: Verify return type
-      "result_st"
+      "result_dy"
    } else {
       "default"
    };
