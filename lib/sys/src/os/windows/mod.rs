@@ -1,6 +1,7 @@
 //! OS Implementations for Windows.
 
 // Public modules
+pub mod console;
 pub mod entry;
 pub mod mem;
 pub mod runtime;
