@@ -34,21 +34,30 @@ pub fn entry(
 
    // Verify function arguments
    if signature.inputs.empty_or_trailing() == false {
-      proc_macro_error::emit_error!(
-         proc_macro_error::SpanRange::call_site(), // TODO: Better span
+      proc_macro_error::emit_call_site_error!(
          "Entrypoint function has non-zero argument count";
 
          help = "Remove all input arguments";
       );
-   }
+   } 
 
-   // TODO: Verify function return type (output) in here
-   // instead of evaluating in the sys macro for better
-   // error messages.
+   // Store function identifier
+   let identifier = signature.ident;
+
+   // Choose initialization type based on return type
+   let init_type = if let syn::ReturnType::Type(_, ty) = signature.output {
+      // TODO: Verify return type
+      "result-dyn"
+   } else {
+      "default"
+   };
 
    // Format entry point constrution
    let slib_entry : proc_macro::TokenStream = format!(r"
-     
+      nusion::sys::build_slib_entry!(
+         {identifier},
+         {init_type}
+      );
    ").parse().unwrap();
 
    // Insert entrypoint before the user function and return
