@@ -11,9 +11,10 @@ pub mod os;
 pub mod cpu;
 
 // Public modules
+pub mod console;
+pub mod env;
 pub mod macros;
 pub mod mem;
-pub mod runtime;
 
 // Unit tests
 #[cfg(tests)]

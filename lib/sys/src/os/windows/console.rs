@@ -40,17 +40,21 @@ impl std::fmt::Display for ConsoleError {
 }
 
 impl Console {
-   pub fn new(
-      title : & str,
-   ) -> Result<Self, ConsoleError> {
+   pub fn new() -> Result<Self, ConsoleError> {
       if unsafe{AllocConsole()} == FALSE {
          return Err(ConsoleError::Unknown);
       }
 
       let mut con = Self{};
-      con.set_title(title)?;
+      con.set_title("Nusion Console")?;
 
       return Ok(con);
+   }
+
+   pub fn get_title(
+      & self,
+   ) -> Result<String, ConsoleError> {
+      return Ok(String::from(""));
    }
 
    pub fn set_title(

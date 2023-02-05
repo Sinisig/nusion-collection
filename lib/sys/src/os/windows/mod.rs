@@ -3,8 +3,8 @@
 // Public modules
 pub mod console;
 pub mod entry;
+pub mod env;
 pub mod mem;
-pub mod runtime;
 
 // Public API re-exports
 pub use winapi;
