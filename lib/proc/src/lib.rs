@@ -46,8 +46,56 @@ pub fn entry(
 
    // Choose initialization type based on return type
    let init_type = if let syn::ReturnType::Type(_, ty) = signature.output {
-      // TODO: Verify return type
-      "result_dy"
+      let ty = if let syn::Type::Path(p) = *ty {
+         p.path.segments
+      } else {proc_macro_error::abort_call_site!(
+         "Return type is not a Result",
+      )};
+
+      // Check to make sure it's Result
+      let ty = ty.first().unwrap();
+      if ty.ident != "Result" {proc_macro_error::abort_call_site!(
+         "Return type is not a Result",
+      )};
+
+      // Get generic arguments
+      let ty = match &ty.arguments {
+         syn::PathArguments::AngleBracketed(a)  => a.clone(),
+         _ => return user_func,
+      };
+      let ok   = match ty.args.iter().nth(0).unwrap() {
+         syn::GenericArgument::Type(t) => t,
+         _ => return user_func,
+      };
+      let err  = match ty.args.iter().nth(1).unwrap() {
+         syn::GenericArgument::Type(t) => t,
+         _ => return user_func,
+      };
+
+      // Validate ok variant
+      let ok = if let syn::Type::Tuple(t) = ok {
+         t
+      } else {proc_macro_error::abort_call_site!(
+         "Ok variant is not the unit type",
+      )};
+      if ok.elems.empty_or_trailing() == false {proc_macro_error::abort_call_site!(
+         "Ok variant is not the unit type",
+      )};
+
+      // Validate err variant
+      let err = if let syn::Type::Path(p) = err {
+         p
+      } else {proc_macro_error::abort_call_site!(
+         "Err variant is not a static nor dynamic trait object",
+      )};
+      let err = err.path.segments.first().unwrap();
+
+      // Detect if static or dynamic
+      if err.ident == "Box" {
+         "result_dy"
+      } else {
+         "result_st"
+      }
    } else {
       "default"
    };
