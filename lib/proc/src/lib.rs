@@ -6,6 +6,137 @@
 //! but instead include nusion as a dependency, as
 //! nusion re-exports all macros in this crate.
 
+struct EntrypointInfo {
+   identifier  : syn::Ident,
+   return_type : EntrypointReturnType,
+}
+
+enum EntrypointReturnType {
+   Void,    // -> ()
+   Static,  // -> Result<(), E: std::error::Error>
+   Dynamic, // -> Result<(), Box<dyn std::error::Error>>
+}
+
+// Internal helper for parsing a function
+// signature into its return type.  The
+// return type is an error string to be
+// parsed into a compile error.
+fn entry_parse_signature(
+   signature   : syn::Signature,
+) -> Result<EntrypointInfo, String> {
+   // Verify argument list is empty
+   if signature.inputs.is_empty() == false {
+      return Err(format!(
+         "Entrypoint has non-zero argument count",
+      ));
+   }
+
+   // Store function identifier and return type
+   let identifier    = signature.ident;
+   let return_type   = signature.output;
+
+   // Parse the return type if it's () or Result<(), E>
+   let return_type = match return_type {
+      syn::ReturnType::Default
+         => return Ok(EntrypointInfo{
+            identifier  : identifier,
+            return_type : EntrypointReturnType::Void,
+         }),
+      syn::ReturnType::Type(_, ty)
+         => *ty,
+   };
+
+   // Make sure it's an item path
+   let return_type = match return_type {
+      syn::Type::Path(path) => path.path,
+      _ => return Err(format!(
+         "Entrypoint doesn't return a Result type",
+      )),
+   };
+
+   // Get the first and only path segment
+   let return_type = return_type.segments.first().unwrap();
+
+   // Verify it's a Result or std::result::Result
+   if return_type.ident != "Result" &&
+      return_type.ident != "std::result::Result"
+   {
+      return Err(format!(
+         "Entrypoint doesn't return a Result type",
+      ));
+   }
+
+   // Get generic argument list
+   let return_type = match &return_type.arguments {
+      syn::PathArguments::AngleBracketed(args) => args.args.clone(),
+      _ => return Err(format!(
+         "Entrypoint returns invalid Result type",
+      )),
+   };
+
+   // Make sure there are exactly two type generic paramenters
+   if return_type.len() != 2 {
+      return Err(format!(
+         "Entrypoint returns invalid Result type",
+      ));
+   }
+
+   // Break up into Ok type and Err type
+   let return_ok  = match return_type.iter().nth(0).unwrap() {
+      syn::GenericArgument::Type(ty) => ty,
+      _ => return Err(format!(
+         "Entrypoint returns invalid Result type",
+      )),
+   };
+   let return_err = match return_type.iter().nth(1).unwrap() {
+      syn::GenericArgument::Type(ty) => ty,
+      _ => return Err(format!(
+         "Entrypoint returns invalid Result type",
+      )),
+   };
+
+   // Verify the Ok variant is the unit type
+   let return_ok = match return_ok {
+      syn::Type::Tuple(ty) => ty,
+      _ => return Err(format!(
+         "Entrypoint Result Ok variant is not the unit type '()'",
+      )),
+   };
+   if return_ok.elems.is_empty() == false {
+      return Err(format!(
+         "Entrypoint Result Ok variant is not the unit type '()'",
+      ));
+   }
+
+   // Get path item for Err variant
+   let return_err = match return_err {
+      syn::Type::Path(path)   => path,
+      _ => return Err(format!(
+         "Entrypoint Result Err variant is not an item",
+      )),
+   };
+
+   // Isolate the path segment for the item
+   let return_err = return_err.path.segments.first().unwrap();
+
+   // Check if the Err type is a static type or trait object
+   if return_err.ident != "Box" &&
+      return_err.ident != "std::boxed::Box"
+   {
+      return Ok(EntrypointInfo{
+         identifier  : identifier,
+         return_type : EntrypointReturnType::Static,
+      });
+   }
+
+   // We now know that we have a Box<> type, let
+   // the compiler deal with any more mess
+   return Ok(EntrypointInfo{
+      identifier  : identifier,
+      return_type : EntrypointReturnType::Dynamic,
+   });
+}
+
 /// Builds a shared library entrypoint
 /// using the attached function item.
 /// The function signature should be
@@ -25,90 +156,37 @@ pub fn entry(
    // Parse item into function signature
    let signature = match syn::parse_macro_input!(item as syn::Item) {
       syn::Item::Fn(func) => func.sig,
-      _  => proc_macro_error::abort_call_site!(
-         "Entrypoint item is not a function";
-
-         help = "Change item type to a main-like function";
-      ),
+      _  => {
+         proc_macro_error::emit_call_site_error!(
+            "Entrypoint item is not a function",
+         );
+         return user_func;
+      },
    };
 
-   // Verify function arguments
-   if signature.inputs.empty_or_trailing() == false {
-      proc_macro_error::emit_call_site_error!(
-         "Entrypoint function has non-zero argument count";
-
-         help = "Remove all input arguments";
-      );
-   } 
-
-   // Store function identifier
-   let identifier = signature.ident;
-
-   // Choose initialization type based on return type
-   let init_type = if let syn::ReturnType::Type(_, ty) = signature.output {
-      let ty = if let syn::Type::Path(p) = *ty {
-         p.path.segments
-      } else {proc_macro_error::abort_call_site!(
-         "Return type is not a Result",
-      )};
-
-      // Check to make sure it's Result
-      let ty = ty.first().unwrap();
-      if ty.ident != "Result" {proc_macro_error::abort_call_site!(
-         "Return type is not a Result",
-      )};
-
-      // Get generic arguments
-      let ty = match &ty.arguments {
-         syn::PathArguments::AngleBracketed(a)  => a.clone(),
-         _ => return user_func,
-      };
-      let ok   = match ty.args.iter().nth(0).unwrap() {
-         syn::GenericArgument::Type(t) => t,
-         _ => return user_func,
-      };
-      let err  = match ty.args.iter().nth(1).unwrap() {
-         syn::GenericArgument::Type(t) => t,
-         _ => return user_func,
-      };
-
-      // Validate ok variant
-      let ok = if let syn::Type::Tuple(t) = ok {
-         t
-      } else {proc_macro_error::abort_call_site!(
-         "Ok variant is not the unit type",
-      )};
-      if ok.elems.empty_or_trailing() == false {proc_macro_error::abort_call_site!(
-         "Ok variant is not the unit type",
-      )};
-
-      // Validate err variant
-      let err = if let syn::Type::Path(p) = err {
-         p
-      } else {proc_macro_error::abort_call_site!(
-         "Err variant is not a static nor dynamic trait object",
-      )};
-      let err = err.path.segments.first().unwrap();
-
-      // Detect if static or dynamic
-      if err.ident == "Box" {
-         "result_dy"
-      } else {
-         "result_st"
-      }
-   } else {
-      "default"
+   // Parse function signature
+   let signature = match entry_parse_signature(signature) {
+      Ok(sig)  => sig,
+      Err(err) => {
+         proc_macro_error::emit_call_site_error!(err);
+         return user_func;
+      },
+   };
+   
+   // Extract function identifier and return type as a macro arg
+   let identifier    = signature.identifier;
+   let return_type   = match signature.return_type {
+      EntrypointReturnType::Void    => "void",
+      EntrypointReturnType::Static  => "result_static",
+      EntrypointReturnType::Dynamic => "result_dynamic",
    };
 
    // Format entry point constrution
    let slib_entry : proc_macro::TokenStream = format!(r"
-      nusion::sys::build_slib_entry!(
-         {identifier},
-         {init_type}
-      );
+      nusion::sys::build_slib_entry!({identifier}, {return_type});
    ").parse().unwrap();
 
-   // Insert entrypoint before the user function and return
+   // Prepend entrypoint to user entrypoint function and return
    let mut output = proc_macro::TokenStream::new();
    output.extend(slib_entry);
    output.extend(user_func);

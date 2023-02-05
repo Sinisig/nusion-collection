@@ -1,50 +1,65 @@
 //! Runtime initialization for custom
 //! entrypoints.
 
-/// OS return code when start_main succeeds.
-pub const EXIT_SUCCESS : i32 = 0;
-pub const EXIT_FAILURE : i32 = 1;
+//////////////////////
+// TYPE DEFINITIONS //
+//////////////////////
 
-/// Starts main with no return type.
-pub fn run_main_default<F>(
-   entry : F,
-) -> i32
-where F: FnOnce(),
-{
-   entry();
-   return EXIT_SUCCESS;
+/// Struct for keeping track of
+/// runtime information.
+pub struct Runtime {
 }
 
-/// Starts main with a
-/// Result<(), E: std::error::Error>
-/// return type.
-pub fn run_main_result_static<F, E>(
-   entry : F,
-) -> i32
-where F: FnOnce() -> Result<(), E>,
-      E: std::error::Error,
-{
-   if let Err(err) = entry() {
-      eprintln!("Error: {}", err.to_string());
-      return EXIT_FAILURE;
+///////////////////////
+// METHODS - Runtime //
+///////////////////////
+
+impl Runtime {
+   /// Initializes the runtime environment
+   /// and executes an entrypoint with no
+   /// return type.
+   pub fn start_main_void<F>(
+      entrypoint  : F,
+   ) -> crate::os::runtime::OSReturn
+   where F: FnOnce(),
+   {
+      entrypoint();
+      return crate::os::runtime::EXIT_SUCCESS;
    }
 
-   return EXIT_SUCCESS;
-}
+   /// Initializes the runtime environment
+   /// and executes an entrypoint with a
+   /// Result<(), E> return type where E
+   /// implements std::error::Error statically.
+   pub fn start_main_result_static<F, E>(
+      entrypoint  : F,
+   ) -> crate::os::runtime::OSReturn
+   where F: FnOnce() -> Result<(), E>,
+         E: std::error::Error,
+   {
+      if let Err(err) = entrypoint() {
+         eprintln!("Error: {err}");
+         return crate::os::runtime::EXIT_FAILURE;
+      }
 
-/// Starts main with a
-/// Result<(), Box<dyn std::error::Error>>
-/// return type.
-pub fn run_main_result_dynamic<F>(
-   entry : F,
-) -> i32
-where F: FnOnce() -> Result<(), Box<dyn std::error::Error>>
-{
-   if let Err(err) = entry() {
-      eprintln!("Error: {}", err.to_string());
-      return EXIT_FAILURE;
+      return crate::os::runtime::EXIT_SUCCESS;
    }
 
-   return EXIT_SUCCESS;
+   /// Initializes the runtime environment
+   /// and executes an entrypoint with a
+   /// Result<(), Box<dyn std::error::Error>
+   /// return type.
+   pub fn start_main_result_dynamic<F>(
+      entrypoint  : F,
+   ) -> crate::os::runtime::OSReturn
+   where F: FnOnce() -> Result<(), Box<dyn std::error::Error>>,
+   {
+      if let Err(err) = entrypoint() {
+         eprintln!("Error: {err}");
+         return crate::os::runtime::EXIT_FAILURE;
+      }
+
+      return crate::os::runtime::EXIT_SUCCESS;
+   }
 }
 

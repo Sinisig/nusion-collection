@@ -1,8 +1,13 @@
-//! crate::macros OS implementations for Windows.
+//! crate::entry OS implementations for Windows.
 
 // This is how the sausage is made...
+// Remember this isn't evaluated here, but
+// instead in an arbitrary crate using nusion
+// as a dependency.  This is why there is minimal
+// usage of 'use' and functions are prefixed with
+// double underscores.
 #[macro_export]
-macro_rules! build_slib_entry_os {
+macro_rules! os_build_slib_entry {
    ($entry:ident, $init:ident)  => {
       use nusion::sys::os::windows::winapi as __winapi;
 
@@ -22,7 +27,7 @@ macro_rules! build_slib_entry_os {
          let thread_handle = unsafe{__winapi::um::processthreadsapi::CreateThread(
             0 as __winapi::um::minwinbase::LPSECURITY_ATTRIBUTES,
             0,
-            Some(main_thread),
+            Some(__nusion_slib_main_thread),
             dll_module as __winapi::shared::minwindef::LPVOID,
             0,
             0 as __winapi::shared::minwindef::LPDWORD,
@@ -33,7 +38,7 @@ macro_rules! build_slib_entry_os {
 
          // Close the thread handle
          if unsafe{__winapi::um::handleapi::CloseHandle(
-            thread_handle
+            thread_handle,
          )} == __winapi::shared::minwindef::FALSE {
             panic!("Failed to close main thread creation handle");
          }
@@ -43,11 +48,11 @@ macro_rules! build_slib_entry_os {
       }
 
       #[no_mangle]
-      extern "system" fn main_thread(
+      extern "system" fn __nusion_slib_main_thread(
          dll_module : __winapi::shared::minwindef::LPVOID,
       ) -> __winapi::shared::minwindef::DWORD {
          // Execute main
-         let return_code = nusion::sys::runtime::$init($entry) as __winapi::shared::minwindef::DWORD;
+         let return_code = nusion::sys::runtime::Runtime::$init($entry);
 
          // Attempt to unload the library
          unsafe{__winapi::um::libloaderapi::FreeLibraryAndExitThread(
