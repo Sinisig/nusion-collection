@@ -1,7 +1,6 @@
 //! Module containing memory patching
 //! utilities.
 
-use nusion_sys as sys;
 use core::ffi::c_void;
 
 //////////////////////
@@ -20,7 +19,7 @@ pub struct PatchError {
 #[derive(Debug)]
 pub enum PatchErrorKind {
    MemoryError{
-      sys_error   : sys::mem::MemoryError
+      sys_error   : crate::sys::mem::MemoryError
    },
    LengthMismatch{
       found       : usize,
@@ -168,9 +167,9 @@ impl std::fmt::Display for PatchError {
 impl std::error::Error for PatchError {
 }
 
-impl From<sys::mem::MemoryError> for PatchError {
+impl From<crate::sys::mem::MemoryError> for PatchError {
    fn from(
-      value : sys::mem::MemoryError
+      value : crate::sys::mem::MemoryError
    ) -> Self {
       return Self::new(PatchErrorKind::MemoryError{
          sys_error : value,
@@ -333,7 +332,7 @@ impl Patch {
       build_patch    : F,
    ) -> Result<Self>
    where F: FnOnce(& mut [u8]) -> Result<()> {
-      let mut editor = sys::mem::MemoryEditor::open_read_write(
+      let mut editor = crate::sys::mem::MemoryEditor::open_read_write(
          address_range.clone(),
       )?;
 
@@ -391,7 +390,7 @@ impl Drop for Patch {
    fn drop(
       & mut self,
    ) {
-      unsafe{sys::mem::MemoryEditor::open_read_write(
+      unsafe{crate::sys::mem::MemoryEditor::open_read_write(
          self.address_range.clone(),
       ).expect(
          "Failed to restore patched bytes",

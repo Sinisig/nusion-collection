@@ -6,12 +6,12 @@
 //! directly, but instead use safe(r) high-level
 //! wrappers found in nusion.
 
+// Platform-specific modules
+pub mod os;
+pub mod cpu;
+
 // Public modules
 pub mod mem;
-
-// Internal modules
-mod os;
-mod cpu;
 
 // Unit tests
 #[cfg(tests)]

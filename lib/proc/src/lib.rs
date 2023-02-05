@@ -8,28 +8,30 @@
 
 extern crate proc_macro;
 
-/// Attribute which constructs
-/// a dynamic library entrypoint.
-/// This is syntactic sugar for
-/// nusion::framework::entry!(<name>, <return type>).
+/// Builds a shared library entrypoint
+/// using the attached function item.
+/// The function signature should be
+/// the same as main's signature.
+/// This should only ever be used on
+/// a single function.
 #[proc_macro_attribute]
 pub fn entry(
    _     : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-   todo!();
+   // Store the user function for later
+   let user_func = item.clone();
 
-   // Get the function identifier and signature
-   let identifier    = "DUMMY";
-   let return_type   = "DUMMY";
+   // Format entry point constrution
+   let slib_entry : proc_macro::TokenStream = format!(r"
 
-   // Insert the framework macro call
-   // and return the formatted code
-   return format!(r"
-      nusion::build_slib_entrypoint!({identifier}, {return_type});
-
-      {item}
    ").parse().unwrap();
+
+   // Insert entrypoint before the user function and return
+   let mut output = proc_macro::TokenStream::new();
+   output.extend(slib_entry);
+   output.extend(user_func);
+   return output;
 }
 
 // Unit tests
