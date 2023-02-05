@@ -27,12 +27,6 @@ Procedural macro implementations incorporated into nusion.
 Instead, you should use the nusion crate, which includes
 this crate bundled with it.
 
-#### nusion-sys-macros
-System abstraction macros used by nusion-macros.
-<b>This should never be used directly as a dependency.</b>
-Instead, you should use the safe(r) macros found in
-nusion-macros.
-
 
 
 ### Build Requirements
