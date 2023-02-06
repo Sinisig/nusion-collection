@@ -1,46 +1,49 @@
-//! Console management module.
+//! Console window creation and management.
 
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// Contains error information relating
-/// to the console.
+/// An error relating to a Console
+/// instance.
 #[derive(Debug)]
 pub struct ConsoleError {
-   kind : ConsoleErrorKind,
+   kind  : ConsoleErrorKind,
 }
 
-/// Contains the kind of error for
-/// the console.
+/// An error kind enum for ConsoleError.
 #[derive(Debug)]
 pub enum ConsoleErrorKind {
    Unknown,
 }
 
-/// Result type with Ok variant T and Err variant ConsoleError.
+/// A Result type with Err variant ConsoleError.
 pub type Result<T> = std::result::Result<T, ConsoleError>;
 
-/// Stores a handle to the console.
-pub struct Console(crate::os::console::Console);
+/// A console window for printing
+/// text to using the standard
+/// print macros.
+pub struct Console {
+   console  : crate::sys::console::Console,
+}
 
 ////////////////////////////
 // METHODS - ConsoleError //
 ////////////////////////////
 
 impl ConsoleError {
-   /// Creates a new ConsoleError from
-   /// a ConsoleErrorKind.
+   /// Creates a new ConsoleError with
+   /// the given error kind.
    pub fn new(
       kind : ConsoleErrorKind,
    ) -> Self {
       return Self{
-         kind : kind
+         kind : kind,
       };
    }
 
-   /// Gets a reference to the stored
-   /// error kind.
+   /// Gets the ConsoleErrorKind stored
+   /// in the ConsoleError.
    pub fn kind<'l>(
       &'l self,
    ) -> &'l ConsoleErrorKind {
@@ -64,11 +67,15 @@ impl std::fmt::Display for ConsoleError {
 impl std::error::Error for ConsoleError {
 }
 
-impl From<crate::os::console::ConsoleError> for ConsoleError {
+impl From<crate::sys::console::ConsoleError> for ConsoleError {
    fn from(
-      item :   crate::os::console::ConsoleError,
+      item : crate::sys::console::ConsoleError,
    ) -> Self {
-      return Self::new(item.into());
+      use crate::sys::console::ConsoleErrorKind::*;
+
+      return Self::new(match item.kind() {
+         Unknown  => ConsoleErrorKind::Unknown,
+      });
    }
 }
 
@@ -88,45 +95,34 @@ impl std::fmt::Display for ConsoleErrorKind {
    }
 }
 
-impl From<crate::os::console::ConsoleError> for ConsoleErrorKind {
-   fn from(
-      item : crate::os::console::ConsoleError,
-   ) -> Self {
-      use crate::os::console::ConsoleError::*;
-      return match item {
-         Unknown  => Self::Unknown,
-      }
-   }
-}
-
 ///////////////////////
 // METHODS - Console //
 ///////////////////////
 
 impl Console {
-   /// Creates a new console.  If an
-   /// issue occurs such as a console
-   /// already existing, an error is
+   /// Creates a new console window.
+   /// If creation fails, an error is
    /// returned.
    pub fn new() -> Result<Self> {
-      return Ok(Self(crate::os::console::Console::new()?));
+      return Ok(Self{
+         console : crate::sys::console::Console::new()?,
+      });
    }
 
-   /// Copies the window title of the
-   /// console into an owned String.
+   /// Gets an owned string copy of
+   /// the title of the Console.
    pub fn get_title(
       & self,
    ) -> Result<String> {
-      return Ok(self.0.get_title()?);
+      return Ok(self.console.get_title()?);
    }
 
-   /// Sets the window title of the
-   /// console.
+   /// Sets the title of the Console.
    pub fn set_title(
       & mut self,
       title : & str,
-   ) -> Result<& mut Self> {
-      self.0.set_title(title)?;
+   ) -> Result<& Self> {
+      self.console.set_title(title)?;
       return Ok(self);
    }
 }

@@ -2,6 +2,7 @@
 //! modding framework and utilities crate.
 
 // Public modules
+pub mod console;
 pub mod env;
 pub mod patch;
 

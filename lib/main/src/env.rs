@@ -16,14 +16,14 @@ pub struct EnvironmentInitError{
 #[derive(Debug)]
 pub enum EnvironmentInitErrorKind{
    ConsoleAllocFailure{
-      err : crate::sys::console::ConsoleError,
+      err : crate::console::ConsoleError,
    },
 }
 
 /// Struct for keeping track of
 /// environment information.
 pub struct Environment {
-   console  : crate::sys::console::Console,
+   console  : crate::console::Console,
 }
 
 ///////////////////////////////
@@ -115,7 +115,7 @@ impl std::fmt::Display for EnvironmentInitErrorKind {
 
 impl Environment {
    fn init() -> Result<Self, EnvironmentInitError> {
-      let console = crate::sys::console::Console::new().map_err(|err| {
+      let console = crate::console::Console::new().map_err(|err| {
          EnvironmentInitError::new(EnvironmentInitErrorKind::ConsoleAllocFailure{
             err : err,
          })
@@ -247,7 +247,7 @@ impl Environment {
    /// console.
    pub fn console<'l>(
       &'l self,
-   ) -> &'l crate::sys::console::Console {
+   ) -> &'l crate::console::Console {
       return &self.console;
    }
 
@@ -255,7 +255,7 @@ impl Environment {
    /// stored console.
    pub fn console_mut<'l>(
       &'l mut self,
-   ) -> &'l mut crate::sys::console::Console {
+   ) -> &'l mut crate::console::Console {
       return & mut self.console;
    }
 }
