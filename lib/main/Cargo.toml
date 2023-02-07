@@ -8,4 +8,5 @@ edition     = "2021"
 [dependencies]
 nusion-proc-macros   = { path = "../proc" }
 nusion-sys           = { path = "../sys"  }
+lazy_static          = "1.4.0"
 

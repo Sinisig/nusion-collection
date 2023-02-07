@@ -12,6 +12,8 @@ pub use nusion_sys         as sys;
 
 // Public module re-exports
 pub use proc_macros::*;
+pub use env::Environment;
+pub use patch::Patch;
 
 // Unit tests
 #[cfg(tests)]

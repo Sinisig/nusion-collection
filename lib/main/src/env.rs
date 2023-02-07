@@ -1,24 +1,31 @@
 //! Environment initialization and main
 //! thread entrypoint creation.
 
+use std::sync::{Mutex, MutexGuard};
+
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// Error type for when the environment
-/// fails to initialize.
+/// Error type relating to some
+/// issue with the environment.
 #[derive(Debug)]
-pub struct EnvironmentInitError{
-   kind  : EnvironmentInitErrorKind,
+pub struct EnvironmentError{
+   kind  : EnvironmentErrorKind,
 }
 
-/// Error kind for EnvironmentInitError
+/// Error kind for EnvironmentError
 #[derive(Debug)]
-pub enum EnvironmentInitErrorKind{
-   ConsoleAllocFailure{
+pub enum EnvironmentErrorKind{
+   ConsoleError{
       err : crate::console::ConsoleError,
    },
+   PoisonedContext,
 }
+
+/// Result type with Err variant
+/// EnvironmentError.
+pub type Result<T> = std::result::Result<T, EnvironmentError>;
 
 /// Struct for keeping track of
 /// environment information.
@@ -26,42 +33,15 @@ pub struct Environment {
    console  : crate::console::Console,
 }
 
-///////////////////////////////
-// INTERNAL GLOBAL VARIABLES //
-///////////////////////////////
+////////////////////////////////
+// METHODS - EnvironmentError //
+////////////////////////////////
 
-static mut MAIN_THREAD_ENVIRONMENT : Option<std::sync::Mutex<Environment>>
-   = None;
-
-///////////////
-// FUNCTIONS //
-///////////////
-
-/// Gets a reference to the main thread's
-/// environment information.
-pub fn environment() -> &'static Environment {
-   return environment_mut();
-}
-
-/// Gets a mutable reference to the main thread's
-/// environment information.
-pub fn environment_mut() -> &'static mut Environment {
-   return unsafe{MAIN_THREAD_ENVIRONMENT.as_mut().expect(
-      "Environment is uninitialized",
-   )}.get_mut().expect(
-      "Failed to unlock environment mutex",
-   );
-}
-
-////////////////////////////////////
-// METHODS - EnvironmentInitError //
-////////////////////////////////////
-
-impl EnvironmentInitError {
-   /// Creates a new EnvironmentInitError from
-   /// a EnvironmentInitErrorKind.
+impl EnvironmentError {
+   /// Creates a new EnvironmentError from
+   /// a EnvironmentErrorKind.
    pub fn new(
-      kind : EnvironmentInitErrorKind,
+      kind : EnvironmentErrorKind,
    ) -> Self {
       return Self{
          kind : kind,
@@ -69,19 +49,19 @@ impl EnvironmentInitError {
    }
 
    /// Gets a reference to the stored
-   /// EnvironmentInitErrorKind.
+   /// EnvironmentErrorKind.
    pub fn kind<'l>(
       &'l self,
-   ) -> &'l EnvironmentInitErrorKind {
+   ) -> &'l EnvironmentErrorKind {
       return &self.kind;
    }
 }
 
-//////////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - EnvironmentInitError //
-//////////////////////////////////////////////////
+//////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - EnvironmentError //
+//////////////////////////////////////////////
 
-impl std::fmt::Display for EnvironmentInitError {
+impl std::fmt::Display for EnvironmentError {
    fn fmt(
       & self,
       stream : & mut std::fmt::Formatter<'_>,
@@ -90,21 +70,41 @@ impl std::fmt::Display for EnvironmentInitError {
    }
 }
 
-impl std::error::Error for EnvironmentInitError {
+impl std::error::Error for EnvironmentError {
 }
 
-//////////////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - EnvironmentInitErrorKind //
-//////////////////////////////////////////////////////
+impl From<crate::console::ConsoleError> for EnvironmentError {
+   fn from(
+      item : crate::console::ConsoleError,
+   ) -> Self {
+      return Self::new(EnvironmentErrorKind::ConsoleError{
+         err : item,
+      });
+   }
+}
 
-impl std::fmt::Display for EnvironmentInitErrorKind {
+impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
+   fn from(
+      _ : std::sync::PoisonError<T>,
+   ) -> Self {
+      return Self::new(EnvironmentErrorKind::PoisonedContext);
+   }
+}
+
+//////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - EnvironmentErrorKind //
+//////////////////////////////////////////////////
+
+impl std::fmt::Display for EnvironmentErrorKind {
    fn fmt(
       & self,
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
       return match self {
-         Self::ConsoleAllocFailure{err}
-            => write!(stream, "Console allocation failure: {err}"),
+         Self::ConsoleError{err}
+            => write!(stream, "Console error: {err}"),
+         Self::PoisonedContext
+            => write!(stream, "Environment context is poisoned"),
       };
    }
 }
@@ -113,13 +113,86 @@ impl std::fmt::Display for EnvironmentInitErrorKind {
 // INTERNAL METHODS - Environment //
 ////////////////////////////////////
 
+// Rust compiler: Noooo! You can't
+// create uninitialized mutable
+// global variables!  It's not
+// thread safe and violates
+// encapsulation!
+//
+// Me: Haha, unsafe{} go brrrr
+// Segmentation fault (core dumped)
+// 
+// ...
+//
+// Please make sure to initialize
+// this variable :)
+static mut ENVIRONMENT_GLOBAL_STATE
+   : Environment
+   = unsafe{std::mem::MaybeUninit::uninit().assume_init()};
+
+lazy_static::lazy_static!{
+static ref ENVIRONMENT_GLOBAL_STATE_GUARD
+   : Mutex<&'static mut Environment>
+   = Mutex::new(unsafe{&mut ENVIRONMENT_GLOBAL_STATE});
+}
+
 impl Environment {
-   fn init() -> Result<Self, EnvironmentInitError> {
-      let console = crate::console::Console::new().map_err(|err| {
-         EnvironmentInitError::new(EnvironmentInitErrorKind::ConsoleAllocFailure{
-            err : err,
-         })
-      })?;
+   /// For the love of god, call this
+   /// function before EVER using the
+   /// global context.  Also never call
+   /// this more than once without a
+   /// global_state_free() call.
+   unsafe fn global_state_init(self) {
+      // Done to prevent compiler from calling
+      // Drop on the uninitialized state which
+      // will almost certaintly cause a crash.
+      std::mem::forget(std::mem::replace(
+         &mut ENVIRONMENT_GLOBAL_STATE, self,
+      ));
+
+      return;
+   }
+
+   /// Clears the global state, freeing
+   /// all items in it.  Don't even think
+   /// about calling this function then
+   /// using the global state.  Fails if
+   /// the mutex guard dies in transit.
+   /// Calling twice in a row without
+   /// initializing again is undefined
+   /// behavior.
+   unsafe fn global_state_free() -> Result<()> {
+      // Done like this to block until every thread
+      // is done accessing the environment.
+      let _guard = ENVIRONMENT_GLOBAL_STATE_GUARD.lock()?;
+      ENVIRONMENT_GLOBAL_STATE = std::mem::MaybeUninit::uninit().assume_init();
+      return Ok(());
+   }
+
+   /// The only safe part of any of this
+   /// global state nonsense.
+   fn global_state_guard<'l>(
+   ) -> Result<MutexGuard<'l, &'static mut Self>> {
+      return Ok(ENVIRONMENT_GLOBAL_STATE_GUARD.lock()?);
+   }
+
+   /// Forcibly casts to a const reference
+   /// Why yes, I program in C
+   fn global_state_ref<'l>(
+   ) -> Result<MutexGuard<'l, &'static Self>> {
+      let guard = Self::global_state_guard()?;
+
+      // Yikes!
+      let guard = unsafe{std::mem::transmute::<
+         MutexGuard<'l, &'static mut   Self>,
+         MutexGuard<'l, &'static       Self>,
+      >(guard)};
+
+      return Ok(guard);
+   }
+
+   fn new() -> Result<Self> {
+      let console = crate::console::Console::new()?;
 
       return Ok(Self{
          console  : console,
@@ -148,21 +221,13 @@ impl Environment {
    ) -> crate::sys::env::OSReturn
    where F: FnOnce(),
    {
-      let environment = Self::init().expect(
+      unsafe{Self::new().expect(
          "Failed to initialize environment",
-      );
-
-      if unsafe{MAIN_THREAD_ENVIRONMENT.is_none()} == false {
-         panic!("Attempted to re-initialize environment");
-      } else {
-         unsafe{MAIN_THREAD_ENVIRONMENT = Some(
-            std::sync::Mutex::new(environment)
-         )};
-      }
+      ).global_state_init()};
 
       entrypoint();
 
-      unsafe{MAIN_THREAD_ENVIRONMENT = None};
+      unsafe{Self::global_state_free().expect("Failed to free environment")};
       return crate::sys::env::OSReturn::SUCCESS;
    }
 
@@ -181,27 +246,20 @@ impl Environment {
    pub fn start_main_result_static<F, E>(
       entrypoint  : F,
    ) -> crate::sys::env::OSReturn
-   where F: FnOnce() -> Result<(), E>,
+   where F: FnOnce() -> std::result::Result<(), E>,
          E: std::error::Error,
    {
-      let environment = Self::init().expect(
+      unsafe{Self::new().expect(
          "Failed to initialize environment",
-      );
-
-      if unsafe{MAIN_THREAD_ENVIRONMENT.is_none()} == false {
-         panic!("Attempted to re-initialize environment");
-      } else {
-         unsafe{MAIN_THREAD_ENVIRONMENT = Some(
-            std::sync::Mutex::new(environment)
-         )};
-      }
+      ).global_state_init()};
 
       if let Err(err) = entrypoint() {
          eprintln!("Error: {err}");
+         unsafe{Self::global_state_free().expect("Failed to free environment")};
          return crate::sys::env::OSReturn::FAILURE;
       }
 
-      unsafe{MAIN_THREAD_ENVIRONMENT = None};
+      unsafe{Self::global_state_free().expect("Failed to free environment")};
       return crate::sys::env::OSReturn::SUCCESS;
    }
 
@@ -220,27 +278,74 @@ impl Environment {
    pub fn start_main_result_dynamic<F>(
       entrypoint  : F,
    ) -> crate::sys::env::OSReturn
-   where F: FnOnce() -> Result<(), Box<dyn std::error::Error>>,
+   where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
    {
-      let environment = Self::init().expect(
+      unsafe{Self::new().expect(
          "Failed to initialize environment",
-      );
-
-      if unsafe{MAIN_THREAD_ENVIRONMENT.is_none()} == false {
-         panic!("Attempted to re-initialize environment");
-      } else {
-         unsafe{MAIN_THREAD_ENVIRONMENT = Some(
-            std::sync::Mutex::new(environment)
-         )};
-      } 
+      ).global_state_init()};
 
       if let Err(err) = entrypoint() {
          eprintln!("Error: {err}");
+         unsafe{Self::global_state_free().expect("Failed to free environment")};
          return crate::sys::env::OSReturn::FAILURE;
       }
 
-      unsafe{MAIN_THREAD_ENVIRONMENT = None};
+      unsafe{Self::global_state_free().expect("Failed to free environment")};
       return crate::sys::env::OSReturn::SUCCESS;
+   } 
+
+   /// Gets a handle to the program's
+   /// environment.
+   ///
+   /// <h2 id=  environment_get_panics>
+   /// <a href=#environment_get_panics>
+   /// Panics
+   /// </a></h2>
+   ///
+   /// If the function is unable to access
+   /// the environment, the program will
+   /// panic.  For a non-panicking version,
+   /// use Environment::try_get().
+   pub fn get<'l>(
+   ) -> MutexGuard<'l, &'static Self> {
+      return Self::try_get().expect(
+         "Failed to access environment",
+      );
+   }
+
+   /// Gets a mutable handle to the
+   /// program's environment.
+   ///
+   /// <h2 id=  environment_get_mut_panics>
+   /// <a href=#environment_get_mut_panics>
+   /// Panics
+   /// </a></h2>
+   ///
+   /// If the function is unable to access
+   /// the environment, the program will
+   /// panic.  For a non-panicking version,
+   /// use Environment::try_get_mut().
+   pub fn get_mut<'l>(
+   ) -> MutexGuard<'l, &'static mut Self> {
+      return Self::try_get_mut().expect(
+         "Failed to access mutable environment",
+      );
+   }
+
+   /// Tries to get a mutable handle to
+   /// the program's environment, returning
+   /// an error upon failure.
+   pub fn try_get_mut<'l>(
+   ) -> Result<MutexGuard<'l, &'static mut Self>> {
+      return Self::global_state_guard();
+   }
+
+   /// Tries to get a handle to the
+   /// program's environment, returning
+   /// an error upon failure.
+   pub fn try_get<'l>(
+   ) -> Result<MutexGuard<'l, &'static Self>> {
+      return Self::global_state_ref();
    }
 
    /// Gets a reference to the stored
