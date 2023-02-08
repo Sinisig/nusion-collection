@@ -205,95 +205,6 @@ impl Environment {
 ///////////////////////////
 
 impl Environment {
-   /// Initializes the thread environment
-   /// and executes an entrypoint with no
-   /// return type.
-   ///
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn start_main_void<F>(
-      entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
-   where F: FnOnce(),
-   {
-      unsafe{Self::new().expect(
-         "Failed to initialize environment",
-      ).global_state_init()};
-
-      entrypoint();
-
-      unsafe{Self::global_state_free().expect("Failed to free environment")};
-      return crate::sys::env::OSReturn::SUCCESS;
-   }
-
-   /// Initializes the thread environment
-   /// and executes an entrypoint with a
-   /// Result<(), E> return type where E
-   /// implements std::error::Error statically.
-   ///
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn start_main_result_static<F, E>(
-      entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
-   where F: FnOnce() -> std::result::Result<(), E>,
-         E: std::error::Error,
-   {
-      unsafe{Self::new().expect(
-         "Failed to initialize environment",
-      ).global_state_init()};
-
-      if let Err(err) = entrypoint() {
-         eprintln!("Error: {err}");
-         unsafe{Self::global_state_free().expect("Failed to free environment")};
-         return crate::sys::env::OSReturn::FAILURE;
-      }
-
-      unsafe{Self::global_state_free().expect("Failed to free environment")};
-      return crate::sys::env::OSReturn::SUCCESS;
-   }
-
-   /// Initializes the thread environment
-   /// and executes an entrypoint with a
-   /// Result<(), Box<dyn std::error::Error>
-   /// return type.
-   /// 
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn start_main_result_dynamic<F>(
-      entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
-   where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
-   {
-      unsafe{Self::new().expect(
-         "Failed to initialize environment",
-      ).global_state_init()};
-
-      if let Err(err) = entrypoint() {
-         eprintln!("Error: {err}");
-         unsafe{Self::global_state_free().expect("Failed to free environment")};
-         return crate::sys::env::OSReturn::FAILURE;
-      }
-
-      unsafe{Self::global_state_free().expect("Failed to free environment")};
-      return crate::sys::env::OSReturn::SUCCESS;
-   } 
-
    /// Gets a handle to the program's
    /// environment.
    ///
@@ -362,6 +273,139 @@ impl Environment {
       &'l mut self,
    ) -> &'l mut crate::console::Console {
       return & mut self.console;
+   }
+}
+
+//////////////////////////////////
+// MAIN EXECUTORS - Environment //
+//////////////////////////////////
+
+/// Creates a new environment and
+/// initializes the global context
+/// with it, returning from the caller
+/// with OSReturn::FAILURE upon failure.
+macro_rules! init_environment {
+   () => {
+      match Environment::new() {
+         Ok(env)  => unsafe{env.global_state_init()},
+         Err(e)   => {
+            eprintln!("Error: Failed to initialize environment: {e}");
+            return crate::sys::env::OSReturn::FAILURE;
+         },
+      }
+   };
+}
+
+/// Frees the global environment context
+/// and drops it, returning from the caller
+/// with OSReturn::FAILURE upon failure.
+macro_rules! free_environment {
+   () => {
+      match unsafe{Environment::global_state_free()} {
+         Ok(_)    => (),
+         Err(e)   => {
+            eprintln!("Error: Failed to free environment: {e}");
+            return crate::sys::env::OSReturn::FAILURE;
+         },
+      }
+   };
+}
+
+/// Executes a main-like function
+/// which has no return type.
+macro_rules! execute_main_void {
+   ($identifier:ident) => {
+      $identifier();
+   };
+}
+
+/// Executes a main-like function
+/// which returns a Result value.
+/// If an Err is returned, the
+/// global environment context will
+/// be freed andthe caller will return
+/// OSReturn::FAILURE to the system.
+macro_rules! execute_main_result {
+   ($identifier:ident) => {
+      if let Err(err) = $identifier() {
+         eprintln!("Error: {err}");
+         free_environment!();
+         return crate::sys::env::OSReturn::FAILURE;
+      }
+   };
+}
+
+impl Environment {
+   /// Initializes the thread environment
+   /// and executes an entrypoint with no
+   /// return type.
+   ///
+   /// <h2   id=note_environment_start_main_result_static>
+   /// <a href=#note_environment_start_main_result_static>
+   /// Note
+   /// </a></h2>
+   /// This function should never be called directly.
+   /// Instead use the nusion::entry attribute macro
+   /// to register a function as the designated entrypoint.
+   pub fn start_main_void<F>(
+      entrypoint  : F,
+   ) -> crate::sys::env::OSReturn
+   where F: FnOnce(),
+   {
+      init_environment!();
+      execute_main_void!(entrypoint);
+      free_environment!();
+
+      return crate::sys::env::OSReturn::SUCCESS;
+   }
+
+   /// Initializes the thread environment
+   /// and executes an entrypoint with a
+   /// Result<(), E> return type where E
+   /// implements std::error::Error statically.
+   ///
+   /// <h2   id=note_environment_start_main_result_static>
+   /// <a href=#note_environment_start_main_result_static>
+   /// Note
+   /// </a></h2>
+   /// This function should never be called directly.
+   /// Instead use the nusion::entry attribute macro
+   /// to register a function as the designated entrypoint.
+   pub fn start_main_result_static<F, E>(
+      entrypoint  : F,
+   ) -> crate::sys::env::OSReturn
+   where F: FnOnce() -> std::result::Result<(), E>,
+         E: std::error::Error,
+   {
+      init_environment!();
+      execute_main_result!(entrypoint);
+      free_environment!();
+
+      return crate::sys::env::OSReturn::SUCCESS;
+   }
+
+   /// Initializes the thread environment
+   /// and executes an entrypoint with a
+   /// Result<(), Box<dyn std::error::Error>
+   /// return type.
+   /// 
+   /// <h2   id=note_environment_start_main_result_static>
+   /// <a href=#note_environment_start_main_result_static>
+   /// Note
+   /// </a></h2>
+   /// This function should never be called directly.
+   /// Instead use the nusion::entry attribute macro
+   /// to register a function as the designated entrypoint.
+   pub fn start_main_result_dynamic<F>(
+      entrypoint  : F,
+   ) -> crate::sys::env::OSReturn
+   where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
+   {
+      init_environment!();
+      execute_main_result!(entrypoint);
+      free_environment!();
+
+      return crate::sys::env::OSReturn::SUCCESS;
    }
 }
 
