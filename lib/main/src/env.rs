@@ -280,16 +280,27 @@ impl Environment {
 // MAIN EXECUTORS - Environment //
 //////////////////////////////////
 
+#[cfg(debug_assertions)]
+const DEBUG_SLEEP_ON_ERROR_DURATION
+   : std::time::Duration
+   = std::time::Duration::from_secs(5);
+
 /// Creates a new environment and
 /// initializes the global context
 /// with it, returning from the caller
 /// with OSReturn::FAILURE upon failure.
+/// In debug mode, it will sleep for a
+/// brief period of time before exiting.
 macro_rules! init_environment {
    () => {
       match Environment::new() {
          Ok(env)  => unsafe{env.global_state_init()},
          Err(e)   => {
             eprintln!("Error: Failed to initialize environment: {e}");
+
+            #[cfg(debug_assertions)]
+            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
+
             return crate::sys::env::OSReturn::FAILURE;
          },
       }
@@ -299,12 +310,18 @@ macro_rules! init_environment {
 /// Frees the global environment context
 /// and drops it, returning from the caller
 /// with OSReturn::FAILURE upon failure.
+/// In debug mode, it will sleep for a
+/// brief period of time before exiting.
 macro_rules! free_environment {
    () => {
       match unsafe{Environment::global_state_free()} {
          Ok(_)    => (),
          Err(e)   => {
             eprintln!("Error: Failed to free environment: {e}");
+
+            #[cfg(debug_assertions)]
+            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
+
             return crate::sys::env::OSReturn::FAILURE;
          },
       }
@@ -325,10 +342,17 @@ macro_rules! execute_main_void {
 /// global environment context will
 /// be freed andthe caller will return
 /// OSReturn::FAILURE to the system.
+/// In debug mode, it will sleep
+/// for a brief period of time before
+/// exiting.
 macro_rules! execute_main_result {
    ($identifier:ident) => {
       if let Err(err) = $identifier() {
          eprintln!("Error: {err}");
+         
+         #[cfg(debug_assertions)]
+         std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
+
          free_environment!();
          return crate::sys::env::OSReturn::FAILURE;
       }
