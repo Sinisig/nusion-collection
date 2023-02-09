@@ -12,9 +12,10 @@ pub mod cpu;
 
 // Public modules
 pub mod console;
-pub mod env;
+pub mod environment;
 pub mod macros;
-pub mod mem;
+pub mod memory;
+pub mod process;
 
 // Unit tests
 #[cfg(tests)]

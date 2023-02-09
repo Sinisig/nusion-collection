@@ -39,7 +39,7 @@ pub type Result<T> = std::result::Result<T, MemoryError>;
 /// trait.
 pub struct MemoryEditor {
    address_range     : std::ops::Range<* const c_void>,
-   old_permissions   : crate::os::mem::MemoryPermissions,
+   old_permissions   : crate::os::memory::MemoryPermissions,
 }
 
 ///////////////////////////
@@ -127,9 +127,9 @@ impl std::fmt::Display for MemoryErrorKind {
 impl MemoryEditor {
    fn open_with_permissions(
       address_range     : std::ops::Range<* const c_void>,
-      new_permissions   : crate::os::mem::MemoryPermissions,
+      new_permissions   : crate::os::memory::MemoryPermissions,
    ) -> Result<Self> {
-      let old_permissions = crate::os::mem::MemoryPermissions::set(
+      let old_permissions = crate::os::memory::MemoryPermissions::set(
          &address_range,
          &new_permissions,
       )?;
@@ -153,7 +153,7 @@ impl MemoryEditor {
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
-         crate::os::mem::MemoryPermissions::READ,
+         crate::os::memory::MemoryPermissions::READ,
       );
    }
 
@@ -164,7 +164,7 @@ impl MemoryEditor {
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
-         crate::os::mem::MemoryPermissions::READ_WRITE,
+         crate::os::memory::MemoryPermissions::READ_WRITE,
       );
    }
 
@@ -175,7 +175,7 @@ impl MemoryEditor {
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
-         crate::os::mem::MemoryPermissions::READ_EXECUTE,
+         crate::os::memory::MemoryPermissions::READ_EXECUTE,
       );
    }
 
@@ -187,7 +187,7 @@ impl MemoryEditor {
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
-         crate::os::mem::MemoryPermissions::READ_WRITE_EXECUTE,
+         crate::os::memory::MemoryPermissions::READ_WRITE_EXECUTE,
       );
    }
 
@@ -198,7 +198,7 @@ impl MemoryEditor {
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
-         crate::os::mem::MemoryPermissions::ALL,
+         crate::os::memory::MemoryPermissions::ALL,
       );
    }
 
@@ -304,7 +304,7 @@ impl Drop for MemoryEditor {
    fn drop(
       & mut self,
    ) { 
-      crate::os::mem::MemoryPermissions::set(
+      crate::os::memory::MemoryPermissions::set(
          &self.address_range,
          &self.old_permissions,
       ).expect(

@@ -1,4 +1,5 @@
-//! crate::mem OS implementations for Windows.
+//! crate::memory OS implementations
+//! for Windows.
 
 use core::ffi::c_void;
 use winapi::{
@@ -65,7 +66,7 @@ impl MemoryPermissions {
    pub fn set(
       address_range  : & std::ops::Range<* const c_void>,
       permissions    : & Self,
-   ) -> crate::mem::Result<Self> {
+   ) -> crate::memory::Result<Self> {
       // Get base address and byte count
       let base    = address_range.start;
       let bytes   = unsafe{address_range.end.offset_from(address_range.start)};
@@ -82,14 +83,14 @@ impl MemoryPermissions {
       }
 
       // Parse error number into MemoryErrorKind
-      use crate::mem::MemoryErrorKind::*;
+      use crate::memory::MemoryErrorKind::*;
       let errkind = match unsafe{GetLastError()} {
          // TODO: Error code parsing
          _           => Unknown,
       };
 
       // Create the MemoryError and return
-      return Err(crate::mem::MemoryError::new(
+      return Err(crate::memory::MemoryError::new(
          errkind, address_range.clone(),
       ));
    }

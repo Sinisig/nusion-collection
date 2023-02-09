@@ -7,7 +7,7 @@
 //////////////////////
 
 /// Return type for returning to the OS.
-pub struct OSReturn(crate::os::env::OSReturn);
+pub struct OSReturn(crate::os::environment::OSReturn);
 
 //////////////////////////
 // CONSTANTS - OSReturn //
@@ -16,11 +16,11 @@ pub struct OSReturn(crate::os::env::OSReturn);
 impl OSReturn {
    /// Value when execution was successful.
    pub const SUCCESS  : Self
-      = Self(crate::os::env::EXIT_SUCCESS);
+      = Self(crate::os::environment::EXIT_SUCCESS);
 
    /// Value when execution failed.
    pub const FAILURE  : Self
-      = Self(crate::os::env::EXIT_FAILURE);
+      = Self(crate::os::environment::EXIT_FAILURE);
 }
 
 ////////////////////////
@@ -32,7 +32,7 @@ impl OSReturn {
    /// instance.
    pub fn get(
       & self,
-   ) -> crate::os::env::OSReturn {
+   ) -> crate::os::environment::OSReturn {
       return self.0.clone();
    }
 }

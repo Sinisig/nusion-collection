@@ -9,54 +9,52 @@
 #[macro_export]
 macro_rules! os_build_slib_entry {
    ($entry:ident, $init:ident)  => {
-      use nusion::sys::os::windows::winapi as __winapi;
-
       #[no_mangle]
       #[allow(non_snake_case)]
       extern "system" fn DllMain(
-         dll_module  : __winapi::shared::minwindef::HINSTANCE,
-         call_reason : __winapi::shared::minwindef::DWORD,
-         _           : __winapi::shared::minwindef::LPVOID,
-      ) -> __winapi::shared::minwindef::BOOL {
+         dll_module  : nusion::__osapi::shared::minwindef::HINSTANCE,
+         call_reason : nusion::__osapi::shared::minwindef::DWORD,
+         _           : nusion::__osapi::shared::minwindef::LPVOID,
+      ) -> nusion::__osapi::shared::minwindef::BOOL {
          // Make sure we only execute on attach
-         if call_reason != __winapi::um::winnt::DLL_PROCESS_ATTACH {
-            return __winapi::shared::minwindef::FALSE;
+         if call_reason != nusion::__osapi::um::winnt::DLL_PROCESS_ATTACH {
+            return nusion::__osapi::shared::minwindef::FALSE;
          }
 
          // Create the main execution thread
-         let thread_handle = unsafe{__winapi::um::processthreadsapi::CreateThread(
-            0 as __winapi::um::minwinbase::LPSECURITY_ATTRIBUTES,
+         let thread_handle = unsafe{nusion::__osapi::um::processthreadsapi::CreateThread(
+            0 as nusion::__osapi::um::minwinbase::LPSECURITY_ATTRIBUTES,
             0,
             Some(__nusion_slib_main_thread),
-            dll_module as __winapi::shared::minwindef::LPVOID,
+            dll_module as nusion::__osapi::shared::minwindef::LPVOID,
             0,
-            0 as __winapi::shared::minwindef::LPDWORD,
+            0 as nusion::__osapi::shared::minwindef::LPDWORD,
          )};
-         if thread_handle == 0 as __winapi::shared::ntdef::HANDLE {
-            return __winapi::shared::minwindef::FALSE;
+         if thread_handle == 0 as nusion::__osapi::shared::ntdef::HANDLE {
+            return nusion::__osapi::shared::minwindef::FALSE;
          }
 
          // Close the thread handle
-         if unsafe{__winapi::um::handleapi::CloseHandle(
+         if unsafe{nusion::__osapi::um::handleapi::CloseHandle(
             thread_handle,
-         )} == __winapi::shared::minwindef::FALSE {
+         )} == nusion::__osapi::shared::minwindef::FALSE {
             panic!("Failed to close main thread creation handle");
          }
 
          // Return success to the DLL loader
-         return __winapi::shared::minwindef::TRUE;
+         return nusion::__osapi::shared::minwindef::TRUE;
       }
 
       #[no_mangle]
       extern "system" fn __nusion_slib_main_thread(
-         dll_module : __winapi::shared::minwindef::LPVOID,
-      ) -> __winapi::shared::minwindef::DWORD {
+         dll_module : nusion::__osapi::shared::minwindef::LPVOID,
+      ) -> nusion::__osapi::shared::minwindef::DWORD {
          // Execute main
-         let return_code = nusion::env::Environment::$init($entry).get();
+         let return_code = nusion::environment::Environment::$init($entry).get();
 
          // Attempt to unload the library
-         unsafe{__winapi::um::libloaderapi::FreeLibraryAndExitThread(
-            dll_module as __winapi::shared::minwindef::HMODULE,
+         unsafe{nusion::__osapi::um::libloaderapi::FreeLibraryAndExitThread(
+            dll_module as nusion::__osapi::shared::minwindef::HMODULE,
             return_code,
          )}
 

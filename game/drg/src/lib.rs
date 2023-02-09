@@ -1,6 +1,6 @@
 #[nusion::entry]
 pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
-   nusion::Environment::try_get_mut()?.console_mut().set_title(
+   nusion::Environment::get_mut().console_mut().set_title(
       "Nusion for Deep Rock Galactic by Sinisig",
    )?;
 

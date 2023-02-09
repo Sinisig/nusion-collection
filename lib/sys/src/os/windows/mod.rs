@@ -1,11 +1,11 @@
 //! OS Implementations for Windows.
 
+// OS API public re-export
+pub use winapi as osapi;
+
 // Public modules
 pub mod console;
 pub mod entry;
-pub mod env;
-pub mod mem;
-
-// Public API re-exports
-pub use winapi;
+pub mod environment;
+pub mod memory;
 

@@ -243,14 +243,6 @@ impl Environment {
       );
    }
 
-   /// Tries to get a mutable handle to
-   /// the program's environment, returning
-   /// an error upon failure.
-   pub fn try_get_mut<'l>(
-   ) -> Result<MutexGuard<'l, &'static mut Self>> {
-      return Self::global_state_guard();
-   }
-
    /// Tries to get a handle to the
    /// program's environment, returning
    /// an error upon failure.
@@ -258,6 +250,14 @@ impl Environment {
    ) -> Result<MutexGuard<'l, &'static Self>> {
       return Self::global_state_ref();
    }
+
+   /// Tries to get a mutable handle to
+   /// the program's environment, returning
+   /// an error upon failure.
+   pub fn try_get_mut<'l>(
+   ) -> Result<MutexGuard<'l, &'static mut Self>> {
+      return Self::global_state_guard();
+   } 
 
    /// Gets a reference to the stored
    /// console.
@@ -301,7 +301,7 @@ macro_rules! init_environment {
             #[cfg(debug_assertions)]
             std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
 
-            return crate::sys::env::OSReturn::FAILURE;
+            return crate::sys::environment::OSReturn::FAILURE;
          },
       }
    };
@@ -322,7 +322,7 @@ macro_rules! free_environment {
             #[cfg(debug_assertions)]
             std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
 
-            return crate::sys::env::OSReturn::FAILURE;
+            return crate::sys::environment::OSReturn::FAILURE;
          },
       }
    };
@@ -354,7 +354,7 @@ macro_rules! execute_main_result {
          std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
 
          free_environment!();
-         return crate::sys::env::OSReturn::FAILURE;
+         return crate::sys::environment::OSReturn::FAILURE;
       }
    };
 }
@@ -373,14 +373,14 @@ impl Environment {
    /// to register a function as the designated entrypoint.
    pub fn start_main_void<F>(
       entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
+   ) -> crate::sys::environment::OSReturn
    where F: FnOnce(),
    {
       init_environment!();
       execute_main_void!(entrypoint);
       free_environment!();
 
-      return crate::sys::env::OSReturn::SUCCESS;
+      return crate::sys::environment::OSReturn::SUCCESS;
    }
 
    /// Initializes the thread environment
@@ -397,7 +397,7 @@ impl Environment {
    /// to register a function as the designated entrypoint.
    pub fn start_main_result_static<F, E>(
       entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
+   ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), E>,
          E: std::error::Error,
    {
@@ -405,7 +405,7 @@ impl Environment {
       execute_main_result!(entrypoint);
       free_environment!();
 
-      return crate::sys::env::OSReturn::SUCCESS;
+      return crate::sys::environment::OSReturn::SUCCESS;
    }
 
    /// Initializes the thread environment
@@ -422,14 +422,14 @@ impl Environment {
    /// to register a function as the designated entrypoint.
    pub fn start_main_result_dynamic<F>(
       entrypoint  : F,
-   ) -> crate::sys::env::OSReturn
+   ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
    {
       init_environment!();
       execute_main_result!(entrypoint);
       free_environment!();
 
-      return crate::sys::env::OSReturn::SUCCESS;
+      return crate::sys::environment::OSReturn::SUCCESS;
    }
 }
 

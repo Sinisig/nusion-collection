@@ -10,19 +10,19 @@
 #[macro_export]
 macro_rules! build_slib_entry {
    ($entry:ident, void)          => {
-      nusion::sys::os_build_slib_entry!(
+      nusion::__os_build_slib_entry!(
          $entry,
          start_main_void
       );
    };
    ($entry:ident, result_static) => {
-      nusion::sys::os_build_slib_entry!(
+      nusion::__os_build_slib_entry!(
          $entry,
          start_main_result_static
       );
    };
    ($entry:ident, result_dynamic) => {
-      nusion::sys::os_build_slib_entry!(
+      nusion::__os_build_slib_entry!(
          $entry,
          start_main_result_dynamic
       );

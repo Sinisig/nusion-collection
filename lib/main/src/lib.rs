@@ -1,19 +1,28 @@
 //! Crate root for nusion, a general game
 //! modding framework and utilities crate.
 
+// Internal crate re-exports
+use nusion_proc_macros  as proc_macros;
+use nusion_sys          as sys;
+
+// Public-internal module re-exports
+pub use sys::os::osapi           as __osapi;
+pub use sys::build_slib_entry    as __build_slib_entry;
+pub use sys::os_build_slib_entry as __os_build_slib_entry;
+
 // Public modules
 pub mod console;
-pub mod env;
+pub mod environment;
 pub mod patch;
-
-// Crate re-exports
-pub use nusion_proc_macros as proc_macros;
-pub use nusion_sys         as sys;
 
 // Public module re-exports
 pub use proc_macros::*;
-pub use env::Environment;
-pub use patch::Patch;
+pub use environment::{
+   Environment,
+};
+pub use patch::{
+   Patch,
+};
 
 // Unit tests
 #[cfg(tests)]

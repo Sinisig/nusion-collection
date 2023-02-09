@@ -1,4 +1,5 @@
-//! crate::os::env implementations for Windows.
+//! crate::os::environment implementations
+//! for Windows.
 
 pub type OSReturn = winapi::shared::minwindef::DWORD;
 
