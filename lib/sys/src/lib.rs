@@ -6,9 +6,12 @@
 //! directly, but instead use safe(r) high-level
 //! wrappers found in nusion.
 
-// Platform-specific modules
-pub mod os;
-pub mod cpu;
+// Internal modules
+mod os;
+mod cpu;
+
+// Public-internal module re-exports
+pub use os::osapi as __osapi;
 
 // Public modules
 pub mod console;
