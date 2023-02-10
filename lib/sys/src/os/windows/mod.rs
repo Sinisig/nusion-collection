@@ -8,4 +8,5 @@ pub mod console;
 pub mod entry;
 pub mod environment;
 pub mod memory;
+pub mod process;
 

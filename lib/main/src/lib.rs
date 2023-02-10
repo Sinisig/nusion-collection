@@ -14,6 +14,7 @@ pub use sys::os_build_slib_entry as __os_build_slib_entry;
 pub mod console;
 pub mod environment;
 pub mod patch;
+pub mod process;
 
 // Public module re-exports
 pub use proc_macros::*;

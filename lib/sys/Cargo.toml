@@ -15,5 +15,6 @@ features = [
    "memoryapi",
    "minwindef",
    "processthreadsapi",
+   "winerror",
 ]
 
