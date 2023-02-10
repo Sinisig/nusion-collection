@@ -53,8 +53,7 @@ pub struct ProcessSnapshot {
    executable_name   : String,
 }
 
-pub struct ModuleSnapshot<'l> {
-   parent_process : &'l ProcessSnapshot,
+pub struct ModuleSnapshot {
    address_range  : std::ops::Range<* const c_void>,
    module_name    : String,
 }
@@ -187,27 +186,21 @@ impl ProcessSnapshot {
    }
 }
 
-impl<'l> ModuleSnapshot<'l> {
-   pub fn parent_process(
-      & self,
-   ) -> &'l ProcessSnapshot {
-      return self.parent_process;
-   }
-
-   pub fn executable_file_name<'u>(
-      &'u self,
-   ) -> &'u str {
+impl ModuleSnapshot {
+   pub fn executable_file_name<'l>(
+      &'l self,
+   ) -> &'l str {
       return &self.module_name;
    }
 
-   pub fn address_range<'u>(
-      &'u self,
-   ) -> &'u std::ops::Range<* const c_void> {
+   pub fn address_range<'l>(
+      &'l self,
+   ) -> &'l std::ops::Range<* const c_void> {
       return &self.address_range;
    }
 
    pub fn all(
-      parent_process : &'l ProcessSnapshot,
+      parent_process : & ProcessSnapshot,
    ) -> Result<Vec<Self>> {
       // Create a snapshot of modules in the given process
       let module_snapshot = unsafe{CreateToolhelp32Snapshot(
@@ -265,7 +258,6 @@ impl<'l> ModuleSnapshot<'l> {
          // Create a new ModuleSnapshot and add it to
          // the list
          module_list.push(Self{
-            parent_process : parent_process,
             address_range  : address_range,
             module_name    : dll_name,
          });

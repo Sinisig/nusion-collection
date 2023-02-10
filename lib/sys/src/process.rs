@@ -31,8 +31,8 @@ pub struct ProcessSnapshot {
 
 /// A snapshot of a module within
 /// a given process snapshot.
-pub struct ModuleSnapshot<'l> {
-   os_snapshot : crate::os::process::ModuleSnapshot<'l>,
+pub struct ModuleSnapshot {
+   os_snapshot : crate::os::process::ModuleSnapshot,
 }
 
 //////////////////////////////////////////////////
@@ -89,7 +89,7 @@ impl ProcessSnapshot {
    /// given process.
    pub fn modules<'l>(
       &'l self,
-   ) -> Result<Vec<ModuleSnapshot<'l>>> {
+   ) -> Result<Vec<ModuleSnapshot>> {
       return ModuleSnapshot::all_within(self);
    }
 
@@ -109,11 +109,11 @@ impl ProcessSnapshot {
 // METHODS - ModuleSnapshot //
 //////////////////////////////
 
-impl<'l> ModuleSnapshot<'l> {
+impl ModuleSnapshot {
    /// Creates a snapshot of every module
    /// within a given process.
    pub fn all_within(
-      parent_process : &'l ProcessSnapshot
+      parent_process : & ProcessSnapshot
    ) -> Result<Vec<Self>> {
       let list = crate::os::process::ModuleSnapshot::all(&parent_process.os_snapshot)?;
       let list = list.into_iter().map(|snap| {
@@ -126,7 +126,7 @@ impl<'l> ModuleSnapshot<'l> {
    /// Gets the address range within
    /// the process occupied by the
    /// module.
-   pub fn address_range(
+   pub fn address_range<'l>(
       &'l self,
    ) -> &'l std::ops::Range<* const c_void> {
       return self.os_snapshot.address_range();
@@ -137,7 +137,7 @@ impl<'l> ModuleSnapshot<'l> {
    /// contains the file name and
    /// extension.  The full path is
    /// not included.
-   pub fn executable_file_name(
+   pub fn executable_file_name<'l>(
       &'l self,
    ) -> &'l str {
       return self.os_snapshot.executable_file_name();
