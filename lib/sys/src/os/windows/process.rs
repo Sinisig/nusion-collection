@@ -58,6 +58,14 @@ pub struct ModuleSnapshot {
    module_name    : String,
 }
 
+macro_rules! try_close_handle {
+   ($handle:ident, $msg:literal) => {
+      if unsafe{CloseHandle($handle)} == FALSE {
+         panic!("Failed to close {} handle", $msg);
+      }
+   };
+}
+
 impl ProcessSnapshot {
    pub fn executable_file_name<'l>(
       &'l self,
@@ -87,9 +95,9 @@ impl ProcessSnapshot {
 
       // Check for failure
       // Double checks for compatibility with WinXP
-      if character_count == 0                ||
-         character_count == NAME_BUFFER_SIZE ||
-         unsafe{GetLastError()} == ERROR_INSUFFICIENT_BUFFER
+      if character_count         == 0                 ||
+         character_count         == NAME_BUFFER_SIZE  ||
+         unsafe{GetLastError()}  == ERROR_INSUFFICIENT_BUFFER
       {
          return Err(ProcessError::BadExecutableFileName);
       }
@@ -132,11 +140,8 @@ impl ProcessSnapshot {
       };
       process_entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as DWORD;
       if unsafe{Process32First(process_snapshot, & mut process_entry)} == FALSE {
-         // TODO: Proper error handling
-         if unsafe{CloseHandle(process_snapshot)} == FALSE {
-            panic!("Failed to close process snapshot handle");
-         }
-
+         // TODO: Proper error handling 
+         try_close_handle!(process_snapshot, "process snapshot");
          return Err(ProcessError::Unknown);
       }
 
@@ -156,9 +161,7 @@ impl ProcessSnapshot {
          let process_exe = match String::from_utf8(process_exe) {
             Ok(s)    => s,
             Err(_)   => {
-               if unsafe{CloseHandle(process_snapshot)} == FALSE {
-                  panic!("Failed to close process snapshot handle");
-               }
+               try_close_handle!(process_snapshot, "process snapshot");
                return Err(ProcessError::BadExecutableFileName);
             },
          };
@@ -179,9 +182,7 @@ impl ProcessSnapshot {
       } 
 
       // Close the process snapshot handle and return
-      if unsafe{CloseHandle(process_snapshot)} == FALSE {
-         panic!("Failed to close process snapshot handle");
-      }
+      try_close_handle!(process_snapshot, "process snapshot");
       return Ok(process_list);
    }
 }
@@ -218,9 +219,7 @@ impl ModuleSnapshot {
       module_entry.dwSize = std::mem::size_of::<MODULEENTRY32>() as DWORD;
       if unsafe{Module32First(module_snapshot, & mut module_entry)} == FALSE {
          // TODO: Better error propagation
-         if unsafe{CloseHandle(module_snapshot)} == FALSE {
-            panic!("Failed to close module snapshot handle");
-         }
+         try_close_handle!(module_snapshot, "module snapshot");
          return Err(ProcessError::Unknown);
       }
 
@@ -248,9 +247,7 @@ impl ModuleSnapshot {
          let dll_name = match String::from_utf8(dll_name) {
             Ok(s)    => s,
             Err(_)   => {
-               if unsafe{CloseHandle(module_snapshot)} == FALSE {
-                  panic!("Failed to close module snapshot handle");
-               }
+               try_close_handle!(module_snapshot, "module snapshot");
                return Err(ProcessError::BadExecutableFileName);
             },
          };
@@ -271,9 +268,7 @@ impl ModuleSnapshot {
       }
 
       // Close the module snapshot handle and return
-      if unsafe{CloseHandle(module_snapshot)} == FALSE {
-         panic!("Failed to close module snapshot handle");
-      }
+      try_close_handle!(module_snapshot, "module snapshot");
       return Ok(module_list);
    }
 }
