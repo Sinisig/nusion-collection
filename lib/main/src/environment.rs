@@ -10,10 +10,13 @@ use std::sync::{Mutex, MutexGuard};
 /// An error relating to the environment.
 #[derive(Debug)]
 pub enum EnvironmentError {
+   PoisonedContext,
    ConsoleError{
       err : crate::console::ConsoleError,
    },
-   PoisonedContext,
+   ProcessError{
+      err : crate::process::ProcessError,
+   },
 }
 
 /// Result type with Err variant
@@ -24,6 +27,7 @@ pub type Result<T> = std::result::Result<T, EnvironmentError>;
 /// environment information.
 pub struct Environment {
    console  : crate::console::Console,
+   process  : crate::process::ProcessSnapshot,
 }
 
 //////////////////////////////////////////////
@@ -36,15 +40,25 @@ impl std::fmt::Display for EnvironmentError {
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
       return match self {
-         Self::ConsoleError{err}
-            => write!(stream, "Console error: {err}"),
          Self::PoisonedContext
             => write!(stream, "Environment context is poisoned"),
+         Self::ConsoleError{err}
+            => write!(stream, "Console error: {err}"),
+         Self::ProcessError{err}
+            => write!(stream, "Process error: {err}"),
       };
    }
 }
 
 impl std::error::Error for EnvironmentError {
+}
+
+impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
+   fn from(
+      _ : std::sync::PoisonError<T>,
+   ) -> Self {
+      return Self::PoisonedContext;
+   }
 }
 
 impl From<crate::console::ConsoleError> for EnvironmentError {
@@ -57,11 +71,13 @@ impl From<crate::console::ConsoleError> for EnvironmentError {
    }
 }
 
-impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
+impl From<crate::process::ProcessError> for EnvironmentError {
    fn from(
-      _ : std::sync::PoisonError<T>,
+      item : crate::process::ProcessError,
    ) -> Self {
-      return Self::PoisonedContext;
+      return Self::ProcessError{
+         err : item,
+      };
    }
 }
 
@@ -69,59 +85,35 @@ impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
 // INTERNAL METHODS - Environment //
 ////////////////////////////////////
 
-// Rust compiler: Noooo! You can't
-// create uninitialized mutable
-// global variables!  It's not
-// thread safe and violates
-// encapsulation!
-//
-// Me: Haha, unsafe{} go brrrr
-// Segmentation fault (core dumped)
-// 
-// ...
-//
-// Please make sure to initialize
-// this variable :)
 static mut ENVIRONMENT_GLOBAL_STATE
-   : Environment
-   = unsafe{std::mem::MaybeUninit::uninit().assume_init()};
+   : Option<Environment>
+   = None;
 
 lazy_static::lazy_static!{
 static ref ENVIRONMENT_GLOBAL_STATE_GUARD
    : Mutex<&'static mut Environment>
-   = Mutex::new(unsafe{&mut ENVIRONMENT_GLOBAL_STATE});
+   = Mutex::new(unsafe{ENVIRONMENT_GLOBAL_STATE.as_mut().expect(
+      "Accessed environment before initialization, this is a programming bug",
+   )});
 }
 
 impl Environment {
-   /// For the love of god, call this
-   /// function before EVER using the
-   /// global context.  Also never call
-   /// this more than once without a
-   /// global_state_free() call.
+   // Make sure to initialize before accessing
+   // the guard, otherwise the program will
+   // panic.
    unsafe fn global_state_init(self) {
-      // Done to prevent compiler from calling
-      // Drop on the uninitialized state which
-      // will almost certaintly cause a crash.
-      std::mem::forget(std::mem::replace(
-         &mut ENVIRONMENT_GLOBAL_STATE, self,
-      ));
-
+      ENVIRONMENT_GLOBAL_STATE = Some(self);
       return;
    }
 
-   /// Clears the global state, freeing
-   /// all items in it.  Don't even think
-   /// about calling this function then
-   /// using the global state.  Fails if
-   /// the mutex guard dies in transit.
-   /// Calling twice in a row without
-   /// initializing again is undefined
-   /// behavior.
+   // Don't use the guard after freeing, as this
+   // will leave the mutex guard with a dangling
+   // reference.
    unsafe fn global_state_free() -> Result<()> {
       // Done like this to block until every thread
       // is done accessing the environment.
       let _guard = ENVIRONMENT_GLOBAL_STATE_GUARD.lock()?;
-      ENVIRONMENT_GLOBAL_STATE = std::mem::MaybeUninit::uninit().assume_init();
+      ENVIRONMENT_GLOBAL_STATE = None;
       return Ok(());
    }
 
@@ -147,11 +139,15 @@ impl Environment {
       return Ok(guard);
    }
 
+   /// Creates a new instance of an
+   /// environment
    fn new() -> Result<Self> {
       let console = crate::console::Console::new()?;
+      let process = crate::process::ProcessSnapshot::local()?;
 
       return Ok(Self{
          console  : console,
+         process  : process,
       });
    }
 }
@@ -229,6 +225,14 @@ impl Environment {
       &'l mut self,
    ) -> &'l mut crate::console::Console {
       return & mut self.console;
+   }
+
+   /// Gets a reference to the current
+   /// process information.
+   pub fn process<'l>(
+      &'l self,
+   ) -> &'l crate::process::ProcessSnapshot {
+      return &self.process;
    }
 }
 
