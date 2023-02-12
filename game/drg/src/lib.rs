@@ -2,12 +2,11 @@
 pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    const GAME_PROCESS_NAME : &str = "FSD-Win64-Shipping.exe";
 
-   let mut env = nusion::Environment::try_get_mut()?;
-   env.console_mut().set_title(
+   nusion::env_mut!().console_mut().set_title(
       "Nusion for Deep Rock Galactic by Sinisig",
    )?;
 
-   let game_module = match env.modules().find_by_executable_file_name(
+   let game_module = match nusion::env!().modules().find_by_executable_file_name(
       GAME_PROCESS_NAME,
    ) {
       Some(module)   => module,

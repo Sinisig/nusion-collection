@@ -249,6 +249,60 @@ impl Environment {
    ) -> &'l crate::process::ModuleSnapshotList {
       return &self.modules;
    }
+
+   /// Refreshes the module list for
+   /// the current process in case any
+   /// other modules were loaded or
+   /// unloaded.  For most use cases,
+   /// this function should not be needed
+   /// as processes rarely dynamically load
+   /// or unload modules after initialization.
+   pub fn refresh_modules(
+      & mut self,
+   ) -> Result<& mut Self> {
+      let modules = crate::process::ModuleSnapshotList::all(
+         crate::process::ProcessSnapshot::local()?,
+      )?;
+
+      self.modules = modules;
+      return Ok(self);
+   }
+}
+
+//////////////////////////
+// MACROS - Environment //
+//////////////////////////
+
+/// Shorthand for nusion::Environment::get().
+#[macro_export]
+macro_rules! env {
+   () => {
+      $crate::Environment::get()
+   };
+}
+
+/// Shorthand for nusion::Environment::get_mut().
+#[macro_export]
+macro_rules! env_mut {
+   () => {
+      $crate::Environment::get_mut()
+   };
+}
+
+/// Shorthand for nusion::Environment::try_get().
+#[macro_export]
+macro_rules! try_env {
+   () => {
+      $crate::Environment::try_get()
+   };
+}
+
+/// Shorthand for nusion::Environment::try_env_mut().
+#[macro_export]
+macro_rules! try_env_mut {
+   () => {
+      $crate::Environment::try_get_mut()
+   };
 }
 
 //////////////////////////////////
