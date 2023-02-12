@@ -16,24 +16,24 @@ pub struct OSReturn(crate::os::environment::OSReturn);
 impl OSReturn {
    /// Value when execution was successful.
    pub const SUCCESS  : Self
-      = Self(crate::os::environment::EXIT_SUCCESS);
+      = Self(crate::os::environment::OSReturn::SUCCESS);
 
    /// Value when execution failed.
    pub const FAILURE  : Self
-      = Self(crate::os::environment::EXIT_FAILURE);
+      = Self(crate::os::environment::OSReturn::FAILURE);
 }
 
-////////////////////////
-// METHODS - OSReturn //
-////////////////////////
+//////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - OSReturn //
+//////////////////////////////////////
 
-impl OSReturn {
-   /// Gets the stored value in the OSReturn
-   /// instance.
-   pub fn get(
+impl std::ops::Deref for OSReturn {
+   type Target = crate::os::environment::OSReturn;
+
+   fn deref(
       & self,
-   ) -> crate::os::environment::OSReturn {
-      return self.0.clone();
+   ) -> & Self::Target {
+      return &self.0;
    }
 }
 

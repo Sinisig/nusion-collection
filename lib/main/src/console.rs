@@ -4,16 +4,10 @@
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// An error relating to a Console
-/// instance.
-#[derive(Debug)]
-pub struct ConsoleError {
-   kind  : ConsoleErrorKind,
-}
-
 /// An error kind enum for ConsoleError.
 #[derive(Debug)]
-pub enum ConsoleErrorKind {
+pub enum ConsoleError {
+   InvalidTitleCharacters,
    Unknown,
 }
 
@@ -27,30 +21,6 @@ pub struct Console {
    console  : crate::sys::console::Console,
 }
 
-////////////////////////////
-// METHODS - ConsoleError //
-////////////////////////////
-
-impl ConsoleError {
-   /// Creates a new ConsoleError with
-   /// the given error kind.
-   pub fn new(
-      kind : ConsoleErrorKind,
-   ) -> Self {
-      return Self{
-         kind : kind,
-      };
-   }
-
-   /// Gets the ConsoleErrorKind stored
-   /// in the ConsoleError.
-   pub fn kind<'l>(
-      &'l self,
-   ) -> &'l ConsoleErrorKind {
-      return &self.kind;
-   }
-}
-
 //////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ConsoleError //
 //////////////////////////////////////////
@@ -60,7 +30,12 @@ impl std::fmt::Display for ConsoleError {
       & self,
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
-      return write!(stream, "{}", self.kind());
+      return write!(stream, "{}", match self {
+         Self::InvalidTitleCharacters
+            => "Title contains invalid characters",
+         Self::Unknown
+            => "Unknown",
+      });
    }
 }
 
@@ -71,27 +46,13 @@ impl From<crate::sys::console::ConsoleError> for ConsoleError {
    fn from(
       item : crate::sys::console::ConsoleError,
    ) -> Self {
-      use crate::sys::console::ConsoleErrorKind::*;
-
-      return Self::new(match item.kind() {
-         Unknown  => ConsoleErrorKind::Unknown,
-      });
-   }
-}
-
-//////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - ConsoleErrorKind //
-//////////////////////////////////////////////
-
-impl std::fmt::Display for ConsoleErrorKind {
-   fn fmt(
-      & self,
-      stream : & mut std::fmt::Formatter<'_>,
-   ) -> std::fmt::Result {
-      return write!(stream, "{}", match self {
-         Self::Unknown
-            => "Unknown",
-      });
+      use crate::sys::console::ConsoleError::*;
+      return match item {
+         InvalidTitleCharacters
+            => Self::InvalidTitleCharacters,
+         Unknown
+            => Self::Unknown,
+      }
    }
 }
 

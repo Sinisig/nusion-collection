@@ -1,8 +1,32 @@
 //! crate::os::environment implementations
 //! for Windows.
 
-pub type OSReturn = winapi::shared::minwindef::DWORD;
+use winapi::{
+   shared::{
+      minwindef::{
+         DWORD,
+      },
+   },
+};
 
-pub const EXIT_SUCCESS : OSReturn = 0;
-pub const EXIT_FAILURE : OSReturn = 1;
+#[derive(Copy, Clone)]
+pub struct OSReturn(DWORD);
+
+impl OSReturn {
+   pub const SUCCESS : Self
+      = Self(0);
+
+   pub const FAILURE : Self
+      = Self(1);
+}
+
+impl std::ops::Deref for OSReturn {
+   type Target = DWORD;
+
+   fn deref(
+      & self,
+   ) -> & Self::Target {
+      return &self.0;
+   }
+}
 

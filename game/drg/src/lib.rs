@@ -5,6 +5,7 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    )?;
 
    println!("Hello from the other side!");
+   println!("Console title: {}", nusion::Environment::get().console().get_title()?);
    std::thread::sleep(std::time::Duration::from_secs(5));
 
    return Ok(());

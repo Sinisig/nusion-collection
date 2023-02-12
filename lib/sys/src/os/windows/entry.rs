@@ -50,7 +50,7 @@ macro_rules! os_build_slib_entry {
          dll_module : nusion::__osapi::shared::minwindef::LPVOID,
       ) -> nusion::__osapi::shared::minwindef::DWORD {
          // Execute main
-         let return_code = nusion::environment::Environment::$init($entry).get();
+         let return_code = **nusion::environment::Environment::$init($entry);
 
          // Attempt to unload the library
          unsafe{nusion::__osapi::um::libloaderapi::FreeLibraryAndExitThread(

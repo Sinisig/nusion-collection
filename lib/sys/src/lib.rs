@@ -11,7 +11,7 @@ mod os;
 mod cpu;
 
 // Public-internal module re-exports
-pub use os::osapi as __osapi;
+pub use os::osapi as osapi;
 
 // Public modules
 pub mod console;

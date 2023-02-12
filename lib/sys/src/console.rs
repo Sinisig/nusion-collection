@@ -7,14 +7,8 @@
 /// Contains error information relating
 /// to the console.
 #[derive(Debug)]
-pub struct ConsoleError {
-   kind : ConsoleErrorKind,
-}
-
-/// Contains the kind of error for
-/// the console.
-#[derive(Debug)]
-pub enum ConsoleErrorKind {
+pub enum ConsoleError {
+   InvalidTitleCharacters,
    Unknown,
 }
 
@@ -23,30 +17,6 @@ pub type Result<T> = std::result::Result<T, ConsoleError>;
 
 /// Stores a handle to the console.
 pub struct Console(crate::os::console::Console);
-
-////////////////////////////
-// METHODS - ConsoleError //
-////////////////////////////
-
-impl ConsoleError {
-   /// Creates a new ConsoleError from
-   /// a ConsoleErrorKind.
-   pub fn new(
-      kind : ConsoleErrorKind,
-   ) -> Self {
-      return Self{
-         kind : kind
-      };
-   }
-
-   /// Gets a reference to the stored
-   /// error kind.
-   pub fn kind<'l>(
-      &'l self,
-   ) -> &'l ConsoleErrorKind {
-      return &self.kind;
-   }
-}
 
 //////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ConsoleError //
@@ -57,46 +27,16 @@ impl std::fmt::Display for ConsoleError {
       & self,
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
-      return write!(stream, "{}", self.kind());
-   }
-}
-
-impl std::error::Error for ConsoleError {
-}
-
-impl From<crate::os::console::ConsoleError> for ConsoleError {
-   fn from(
-      item :   crate::os::console::ConsoleError,
-   ) -> Self {
-      return Self::new(item.into());
-   }
-}
-
-//////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - ConsoleErrorKind //
-//////////////////////////////////////////////
-
-impl std::fmt::Display for ConsoleErrorKind {
-   fn fmt(
-      & self,
-      stream : & mut std::fmt::Formatter<'_>,
-   ) -> std::fmt::Result {
       return write!(stream, "{}", match self {
+         Self::InvalidTitleCharacters
+            => "Title contains invalid characters",
          Self::Unknown
             => "Unknown",
       });
    }
 }
 
-impl From<crate::os::console::ConsoleError> for ConsoleErrorKind {
-   fn from(
-      item : crate::os::console::ConsoleError,
-   ) -> Self {
-      use crate::os::console::ConsoleError::*;
-      return match item {
-         Unknown  => Self::Unknown,
-      }
-   }
+impl std::error::Error for ConsoleError {
 }
 
 ///////////////////////
