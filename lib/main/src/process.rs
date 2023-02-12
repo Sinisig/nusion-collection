@@ -3,6 +3,7 @@
 //! processes and their loaded libraries.
 
 use core::ffi::c_void;
+use std::collections::hash_map::HashMap;
 
 //////////////////////
 // TYPE DEFINITIONS //
@@ -31,6 +32,21 @@ pub struct ProcessSnapshot {
 /// or executable within a process.
 pub struct ModuleSnapshot {
    snap  : crate::sys::process::ModuleSnapshot,
+}
+
+/// A list of process snapshots.  Useful
+/// for enumerating and searching the
+/// entire system process tree.
+pub struct ProcessSnapshotList {
+   processes   : HashMap<String, ProcessSnapshot>,
+}
+
+/// A list of module snapshots from a
+/// process.  Useful for searching for
+/// a specific module within a process.
+pub struct ModuleSnapshotList<'l> {
+   parent   : &'l ProcessSnapshot,
+   modules  : HashMap<String, ModuleSnapshot>,
 }
 
 //////////////////////////////////////////
@@ -118,6 +134,167 @@ impl ModuleSnapshot {
       &'l self,
    ) -> &'l str {
       return self.snap.executable_file_name();
+   }
+}
+
+///////////////////////////////////
+// METHODS - ProcessSnapshotList //
+///////////////////////////////////
+
+impl ProcessSnapshotList {
+   /// Creates an empty process
+   /// snapshot list.
+   pub fn new(
+   ) -> Self {
+      return Self{
+         processes : HashMap::new(),
+      };
+   }
+
+   /// Creates a snapshot of every
+   /// process visible to the user
+   /// and stores it in the list.
+   pub fn all(
+   ) -> Result<Self> {
+      let proc = crate::sys::process::ProcessSnapshot::all()?;
+
+      let mut hash = HashMap::with_capacity(proc.len());
+      for proc in proc {
+         let proc = ProcessSnapshot{
+            snap : proc,
+         };
+
+         hash.insert(
+            String::from(proc.executable_file_name()),
+            proc,
+         );
+      }
+
+      return Ok(Self{
+         processes : hash,
+      });
+   } 
+
+   /// Adds a process snapshot to
+   /// the list.
+   pub fn insert(
+      & mut self,
+      process_snapshot  : ProcessSnapshot
+   ) -> & mut Self {
+      self.processes.insert(
+         String::from(process_snapshot.executable_file_name()),
+         process_snapshot,
+      );
+      return self;
+   }
+
+   /// Removes a process from the
+   /// list by searching for its
+   /// executable file name, returning
+   /// the process snapshot.
+   pub fn remove_by_executable_file_name(
+      & mut self,
+      executable_file_name : & str,
+   ) -> Option<ProcessSnapshot> {
+      return self.processes.remove(executable_file_name);
+   }
+
+   /// Tries to find a process by
+   /// its executable file name.
+   pub fn find_by_executable_file_name(
+      & self,
+      executable_file_name : & str,
+   ) -> Option<& ProcessSnapshot> {
+      return self.processes.get(executable_file_name);
+   } 
+}
+
+//////////////////////////////////
+// METHODS - ModuleSnapshotList //
+//////////////////////////////////
+
+impl<'l> ModuleSnapshotList<'l> {
+   /// Creates an empty module
+   /// snapshot list bound to
+   /// a process snapshot.
+   pub fn new(
+      process_snapshot : &'l ProcessSnapshot,
+   ) -> Self {
+      return Self{
+         parent   : process_snapshot,
+         modules  : HashMap::new(),
+      };
+   }
+
+   /// Creates a snapshot of every
+   /// module within a given process
+   /// snapshot and stores it in the
+   /// list.
+   pub fn all(
+      process_snapshot  : &'l ProcessSnapshot,
+   ) -> Result<Self> {
+      let list = crate::sys::process::ModuleSnapshot::all_within(
+         &process_snapshot.snap,
+      )?;
+
+      let mut hash = HashMap::with_capacity(list.len());
+      for module in list {
+         let module = ModuleSnapshot{
+            snap : module,
+         };
+
+         hash.insert(
+            String::from(module.executable_file_name()),
+            module,
+         );
+      }
+
+      return Ok(Self{
+         parent   : process_snapshot,
+         modules  : hash,
+      });
+   }
+
+   /// Adds a module snapshot to
+   /// the list.
+   pub fn insert(
+      & mut self,
+      module_snapshot   : ModuleSnapshot
+   ) -> & mut Self {
+      self.modules.insert(
+         String::from(module_snapshot.executable_file_name()),
+         module_snapshot,
+      );
+      return self;
+   }
+
+   /// Removes a module from the
+   /// list by searching for its
+   /// executable file name, returning
+   /// the module snapshot.
+   pub fn remove_by_executable_file_name(
+      & mut self,
+      executable_file_name : & str,
+   ) -> Option<ModuleSnapshot> {
+      return self.modules.remove(executable_file_name);
+   }
+
+   /// Tries to find a module by
+   /// its executable file name.
+   pub fn find_by_executable_file_name(
+      & self,
+      executable_file_name : & str,
+   ) -> Option<& ModuleSnapshot> {
+      return self.modules.get(executable_file_name);
+   }
+
+   /// Returns a reference to the process
+   /// snapshot which the module snapshot
+   /// list belongs to.
+   pub fn parent_process(
+      & self,
+   ) -> & ProcessSnapshot {
+      return &self.parent;
    }
 }
 
