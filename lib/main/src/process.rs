@@ -48,6 +48,28 @@ pub struct ModuleSnapshotList {
    modules  : HashMap<String, ModuleSnapshot>,
 }
 
+/// An iterator over a ProcessSnapshotList.
+pub struct ProcessSnapshotListIterator<'s> {
+   iter : std::collections::hash_map::Iter<'s, String, ProcessSnapshot>,
+}
+
+/// An iterator over a ModuleSnapshotList.
+pub struct ModuleSnapshotListIterator<'s> {
+   iter : std::collections::hash_map::Iter<'s, String, ModuleSnapshot>,
+}
+
+/// A consuming iterator over a
+/// ProcessSnapshotList.
+pub struct ProcessSnapshotListIntoIterator {
+   iter : std::collections::hash_map::IntoValues<String, ProcessSnapshot>,
+}
+
+/// A consuming iterator over a
+/// ModuleSnapshotList.
+pub struct ModuleSnapshotListIntoIterator {
+   iter : std::collections::hash_map::IntoValues<String, ModuleSnapshot>,
+}
+
 //////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ProcessError //
 //////////////////////////////////////////
@@ -206,6 +228,26 @@ impl ProcessSnapshotList {
    ) -> Option<& ProcessSnapshot> {
       return self.processes.get(executable_file_name);
    } 
+
+   /// Creates an iterator over the
+   /// processes in the list.
+   pub fn iter<'l>(
+      &'l self,
+   ) -> ProcessSnapshotListIterator<'l> {
+      return ProcessSnapshotListIterator{
+         iter : self.processes.iter(),
+      };
+   }
+
+   /// Creates a consuming iterator
+   /// over the processes in the list.
+   pub fn into_iter(
+      self,
+   ) -> ProcessSnapshotListIntoIterator {
+      return ProcessSnapshotListIntoIterator{
+         iter : self.processes.into_values(),
+      };
+   }
 }
 
 //////////////////////////////////
@@ -294,6 +336,84 @@ impl ModuleSnapshotList {
       & self,
    ) -> & ProcessSnapshot {
       return &self.parent;
+   }
+
+   /// Creates an iterator over the
+   /// modules in the list.
+   pub fn iter<'l>(
+      &'l self,
+   ) -> ModuleSnapshotListIterator<'l> {
+      return ModuleSnapshotListIterator{
+         iter : self.modules.iter(),
+      };
+   }
+
+   /// Creates a consuming iterator
+   /// over the modules in the list.
+   pub fn into_iter(
+      self,
+   ) -> ModuleSnapshotListIntoIterator {
+      return ModuleSnapshotListIntoIterator{
+         iter : self.modules.into_values(),
+      };
+   }
+}
+
+/////////////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ProcessSnapshotListIterator //
+/////////////////////////////////////////////////////////
+
+impl<'s> std::iter::Iterator for ProcessSnapshotListIterator<'s> {
+   type Item = &'s ProcessSnapshot;
+
+   fn next(
+      & mut self,
+   ) -> Option<Self::Item> {
+      return self.iter.next().map(|(_, v)| v);
+   }
+}
+
+////////////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ModuleSnapshotListIterator //
+////////////////////////////////////////////////////////
+
+impl<'s> std::iter::Iterator for ModuleSnapshotListIterator<'s> {
+   type Item = &'s ModuleSnapshot;
+
+   fn next(
+      & mut self,
+   ) -> Option<Self::Item> {
+      return self.iter.next().map(|(_, v)| v);
+   }
+}
+
+/////////////////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ProcessSnapshotListIntoIterator //
+/////////////////////////////////////////////////////////////
+
+impl std::iter::IntoIterator for ProcessSnapshotListIntoIterator {
+   type Item      = ProcessSnapshot;
+   type IntoIter  = std::collections::hash_map::IntoValues<String, ProcessSnapshot>;
+
+   fn into_iter(
+      self,
+   ) -> Self::IntoIter {
+      return self.iter;
+   }
+}
+
+////////////////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ModuleSnapshotListIntoIterator //
+////////////////////////////////////////////////////////////
+
+impl std::iter::IntoIterator for ModuleSnapshotListIntoIterator {
+   type Item      = ModuleSnapshot;
+   type IntoIter  = std::collections::hash_map::IntoValues<String, ModuleSnapshot>;
+
+   fn into_iter(
+      self,
+   ) -> Self::IntoIter {
+      return self.iter;
    }
 }
 

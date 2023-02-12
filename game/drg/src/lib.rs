@@ -26,7 +26,7 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
       addr = game_module.address_range().end,
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
-   
+
    std::thread::sleep(std::time::Duration::from_secs(5));
    return Ok(());
 }
