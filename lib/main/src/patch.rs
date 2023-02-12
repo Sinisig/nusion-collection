@@ -10,14 +10,7 @@ use core::ffi::c_void;
 /// An error type containing the reason
 /// behind a patch creation failing.
 #[derive(Debug)]
-pub struct PatchError {
-   kind  : PatchErrorKind,
-}
-
-/// An error enum containing the reason
-/// behind a PatchError.
-#[derive(Debug)]
-pub enum PatchErrorKind {
+pub enum PatchError {
    MemoryError{
       sys_error   : crate::sys::memory::MemoryError
    },
@@ -119,30 +112,6 @@ pub enum PatchAlignment {
    Center,
 }
 
-//////////////////////////
-// METHODS - PatchError //
-//////////////////////////
-
-impl PatchError {
-   /// Creates a new PatchError from
-   /// a given PatchErrorKind.
-   pub fn new(
-      kind : PatchErrorKind,
-   ) -> Self {
-      return Self{
-         kind : kind,
-      };
-   }
-
-   /// Returns a reference to the
-   /// stored PatchErrorKind.
-   pub fn kind<'l>(
-      &'l self,
-   ) -> &'l PatchErrorKind {
-      return &self.kind;
-   }
-}
-
 ////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - PatchError //
 ////////////////////////////////////////
@@ -152,13 +121,12 @@ impl std::fmt::Display for PatchError {
       & self,
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
-      use PatchErrorKind::*;
-      return match self.kind() {
-         MemoryError    {sys_error,       }
+      return match self {
+         Self::MemoryError    {sys_error,       }
             => write!(stream, "Memory error: {sys_error}",                          ),
-         LengthMismatch {found, expected, }
+         Self::LengthMismatch {found, expected, }
             => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
-         ResidualBytes  {left, right,     }
+         Self::ResidualBytes  {left, right,     }
             => write!(stream, "Residual bytes: {left} on left, {right} on right"),
       };
    }
@@ -171,9 +139,9 @@ impl From<crate::sys::memory::MemoryError> for PatchError {
    fn from(
       value : crate::sys::memory::MemoryError
    ) -> Self {
-      return Self::new(PatchErrorKind::MemoryError{
+      return Self::MemoryError{
          sys_error : value,
-      });
+      };
    }
 }
 
@@ -201,10 +169,10 @@ impl PatchAlignment {
       insert_byte_count : usize,
    ) -> Result<(usize, usize)> {
       if buffer_byte_count < insert_byte_count {
-         return Err(PatchError::new(PatchErrorKind::LengthMismatch{
+         return Err(PatchError::LengthMismatch{
             found    : insert_byte_count,
             expected : buffer_byte_count,
-         }));
+         });
       }
 
       let byte_pad_count   = buffer_byte_count - insert_byte_count;
@@ -231,10 +199,10 @@ impl PatchAlignment {
       let bytes_residual_left    = bytes_pad_left  % element_size;
       let bytes_residual_right   = bytes_pad_right % element_size;
       if bytes_residual_left != 0 || bytes_residual_right != 0 {
-         return Err(PatchError::new(PatchErrorKind::ResidualBytes{
+         return Err(PatchError::ResidualBytes{
             left  : bytes_residual_left,
             right : bytes_residual_right,
-         }));
+         });
       }
 
       let elements_left    = bytes_pad_left  / element_size;

@@ -4,7 +4,8 @@
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// An error kind enum for ConsoleError.
+/// An error relating to a given
+/// console instance.
 #[derive(Debug)]
 pub enum ConsoleError {
    InvalidTitleCharacters,

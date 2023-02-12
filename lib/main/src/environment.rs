@@ -7,16 +7,9 @@ use std::sync::{Mutex, MutexGuard};
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// Error type relating to some
-/// issue with the environment.
+/// An error relating to the environment.
 #[derive(Debug)]
-pub struct EnvironmentError{
-   kind  : EnvironmentErrorKind,
-}
-
-/// Error kind for EnvironmentError
-#[derive(Debug)]
-pub enum EnvironmentErrorKind{
+pub enum EnvironmentError {
    ConsoleError{
       err : crate::console::ConsoleError,
    },
@@ -33,69 +26,11 @@ pub struct Environment {
    console  : crate::console::Console,
 }
 
-////////////////////////////////
-// METHODS - EnvironmentError //
-////////////////////////////////
-
-impl EnvironmentError {
-   /// Creates a new EnvironmentError from
-   /// a EnvironmentErrorKind.
-   pub fn new(
-      kind : EnvironmentErrorKind,
-   ) -> Self {
-      return Self{
-         kind : kind,
-      };
-   }
-
-   /// Gets a reference to the stored
-   /// EnvironmentErrorKind.
-   pub fn kind<'l>(
-      &'l self,
-   ) -> &'l EnvironmentErrorKind {
-      return &self.kind;
-   }
-}
-
 //////////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - EnvironmentError //
 //////////////////////////////////////////////
 
 impl std::fmt::Display for EnvironmentError {
-   fn fmt(
-      & self,
-      stream : & mut std::fmt::Formatter<'_>,
-   ) -> std::fmt::Result {
-      return write!(stream, "{}", self.kind());
-   }
-}
-
-impl std::error::Error for EnvironmentError {
-}
-
-impl From<crate::console::ConsoleError> for EnvironmentError {
-   fn from(
-      item : crate::console::ConsoleError,
-   ) -> Self {
-      return Self::new(EnvironmentErrorKind::ConsoleError{
-         err : item,
-      });
-   }
-}
-
-impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
-   fn from(
-      _ : std::sync::PoisonError<T>,
-   ) -> Self {
-      return Self::new(EnvironmentErrorKind::PoisonedContext);
-   }
-}
-
-//////////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - EnvironmentErrorKind //
-//////////////////////////////////////////////////
-
-impl std::fmt::Display for EnvironmentErrorKind {
    fn fmt(
       & self,
       stream : & mut std::fmt::Formatter<'_>,
@@ -106,6 +41,27 @@ impl std::fmt::Display for EnvironmentErrorKind {
          Self::PoisonedContext
             => write!(stream, "Environment context is poisoned"),
       };
+   }
+}
+
+impl std::error::Error for EnvironmentError {
+}
+
+impl From<crate::console::ConsoleError> for EnvironmentError {
+   fn from(
+      item : crate::console::ConsoleError,
+   ) -> Self {
+      return Self::ConsoleError{
+         err : item,
+      };
+   }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for EnvironmentError {
+   fn from(
+      _ : std::sync::PoisonError<T>,
+   ) -> Self {
+      return Self::PoisonedContext;
    }
 }
 
