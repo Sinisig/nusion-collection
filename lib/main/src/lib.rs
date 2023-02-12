@@ -24,6 +24,12 @@ pub use environment::{
 pub use patch::{
    Patch,
 };
+pub use process::{
+   ProcessSnapshot,
+   ModuleSnapshot,
+   ProcessSnapshotList,
+   ModuleSnapshotList,
+};
 
 // Unit tests
 #[cfg(tests)]

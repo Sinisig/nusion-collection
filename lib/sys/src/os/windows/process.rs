@@ -3,7 +3,6 @@
 
 use crate::process::{ProcessError, Result};
 
-use core::ffi::c_void;
 use winapi::{
    shared::{
       minwindef::{
@@ -54,7 +53,7 @@ pub struct ProcessSnapshot {
 }
 
 pub struct ModuleSnapshot {
-   address_range  : std::ops::Range<* const c_void>,
+   address_range  : std::ops::Range<usize>,
    module_name    : String,
 }
 
@@ -196,7 +195,7 @@ impl ModuleSnapshot {
 
    pub fn address_range<'l>(
       &'l self,
-   ) -> &'l std::ops::Range<* const c_void> {
+   ) -> &'l std::ops::Range<usize> {
       return &self.address_range;
    }
 
@@ -227,8 +226,8 @@ impl ModuleSnapshot {
       let mut module_list = Vec::new();
       'module_loop : loop {
          // Get the address range
-         let base_address  = module_entry.modBaseAddr as * const c_void;
-         let end_address   = unsafe{(base_address as * const u8).add(module_entry.modBaseSize as usize + 1)} as * const c_void;
+         let base_address  = module_entry.modBaseAddr as usize;
+         let end_address   = unsafe{(base_address as * const u8).add(module_entry.modBaseSize as usize + 1)} as usize;
          let address_range = base_address..end_address;
 
          // Get the C-string array and string length

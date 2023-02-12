@@ -2,7 +2,6 @@
 //! processes and create a snapshot of
 //! processes and their loaded libraries.
 
-use core::ffi::c_void;
 use std::collections::hash_map::HashMap;
 
 //////////////////////
@@ -44,8 +43,8 @@ pub struct ProcessSnapshotList {
 /// A list of module snapshots from a
 /// process.  Useful for searching for
 /// a specific module within a process.
-pub struct ModuleSnapshotList<'l> {
-   parent   : &'l ProcessSnapshot,
+pub struct ModuleSnapshotList {
+   parent   : ProcessSnapshot,
    modules  : HashMap<String, ModuleSnapshot>,
 }
 
@@ -121,7 +120,7 @@ impl ModuleSnapshot {
    /// the parent process.
    pub fn address_range<'l>(
       &'l self,
-   ) -> &'l std::ops::Range<* const c_void> {
+   ) -> &'l std::ops::Range<usize> {
       return self.snap.address_range();
    }
 
@@ -213,12 +212,12 @@ impl ProcessSnapshotList {
 // METHODS - ModuleSnapshotList //
 //////////////////////////////////
 
-impl<'l> ModuleSnapshotList<'l> {
+impl ModuleSnapshotList {
    /// Creates an empty module
    /// snapshot list bound to
    /// a process snapshot.
    pub fn new(
-      process_snapshot : &'l ProcessSnapshot,
+      process_snapshot : ProcessSnapshot,
    ) -> Self {
       return Self{
          parent   : process_snapshot,
@@ -231,7 +230,7 @@ impl<'l> ModuleSnapshotList<'l> {
    /// snapshot and stores it in the
    /// list.
    pub fn all(
-      process_snapshot  : &'l ProcessSnapshot,
+      process_snapshot  : ProcessSnapshot,
    ) -> Result<Self> {
       let list = crate::sys::process::ModuleSnapshot::all_within(
          &process_snapshot.snap,

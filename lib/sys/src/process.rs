@@ -4,8 +4,6 @@
 //! processes and performing actions
 //! on them.
 
-use core::ffi::c_void;
-
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -128,7 +126,7 @@ impl ModuleSnapshot {
    /// module.
    pub fn address_range<'l>(
       &'l self,
-   ) -> &'l std::ops::Range<* const c_void> {
+   ) -> &'l std::ops::Range<usize> {
       return self.os_snapshot.address_range();
    }
 

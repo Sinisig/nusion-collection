@@ -28,6 +28,7 @@ pub type Result<T> = std::result::Result<T, EnvironmentError>;
 pub struct Environment {
    console  : crate::console::Console,
    process  : crate::process::ProcessSnapshot,
+   modules  : crate::process::ModuleSnapshotList,
 }
 
 //////////////////////////////////////////////
@@ -143,11 +144,17 @@ impl Environment {
    /// environment
    fn new() -> Result<Self> {
       let console = crate::console::Console::new()?;
+
       let process = crate::process::ProcessSnapshot::local()?;
+
+      let modules = crate::process::ModuleSnapshotList::all(
+         crate::process::ProcessSnapshot::local()?,
+      )?;
 
       return Ok(Self{
          console  : console,
          process  : process,
+         modules  : modules,
       });
    }
 }
@@ -233,6 +240,14 @@ impl Environment {
       &'l self,
    ) -> &'l crate::process::ProcessSnapshot {
       return &self.process;
+   }
+
+   /// Gets a reference to the stored
+   /// module list for the process.
+   pub fn modules<'l>(
+      &'l self,
+   ) -> &'l crate::process::ModuleSnapshotList {
+      return &self.modules;
    }
 }
 
