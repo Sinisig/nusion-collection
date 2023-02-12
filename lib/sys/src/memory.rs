@@ -1,8 +1,6 @@
 //! Various functions used for modifying
 //! arbitrary memory permissions and values.
 
-use core::ffi::c_void;
-
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -12,7 +10,7 @@ use core::ffi::c_void;
 #[derive(Debug)]
 pub struct MemoryError {
    kind           : MemoryErrorKind,
-   address_range  : std::ops::Range<* const c_void>,
+   address_range  : std::ops::Range<usize>,
 }
 
 /// Error enum containing the kind
@@ -38,7 +36,7 @@ pub type Result<T> = std::result::Result<T, MemoryError>;
 /// via the <a href="https://doc.rust-lang.org/std/ops/trait.Drop.html">Drop</a>
 /// trait.
 pub struct MemoryEditor {
-   address_range     : std::ops::Range<* const c_void>,
+   address_range     : std::ops::Range<usize>,
    old_permissions   : crate::os::memory::MemoryPermissions,
 }
 
@@ -51,7 +49,7 @@ impl MemoryError {
    /// enum variant and a memory address range.
    pub fn new(
       kind           : MemoryErrorKind,
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Self {
       return Self{
          kind           : kind,
@@ -71,7 +69,7 @@ impl MemoryError {
    /// the memory error.
    pub fn address_range<'l>(
       &'l self,
-   ) -> &'l std::ops::Range<* const c_void> {
+   ) -> &'l std::ops::Range<usize> {
       return &self.address_range;
    }
 }
@@ -88,8 +86,8 @@ impl std::fmt::Display for MemoryError {
       return write!(stream,
          "{err} {start:#0fill$x} - {end:#0fill$x}",
          err   = self.kind(),
-         start = self.address_range().start as usize,
-         end   = self.address_range().end   as usize,
+         start = self.address_range().start,
+         end   = self.address_range().end,
          fill  = std::mem::size_of::<usize>() * 2 + 2,
       );
    }
@@ -126,7 +124,7 @@ impl std::fmt::Display for MemoryErrorKind {
 
 impl MemoryEditor {
    fn open_with_permissions(
-      address_range     : std::ops::Range<* const c_void>,
+      address_range     : std::ops::Range<usize>,
       new_permissions   : crate::os::memory::MemoryPermissions,
    ) -> Result<Self> {
       let old_permissions = crate::os::memory::MemoryPermissions::set(
@@ -149,7 +147,7 @@ impl MemoryEditor {
    /// Attempts to open a range of memory
    /// for reading.
    pub fn open_read(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
@@ -160,7 +158,7 @@ impl MemoryEditor {
    /// Attempts to open a range of memory
    /// for reading and writing.
    pub fn open_read_write(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
@@ -171,7 +169,7 @@ impl MemoryEditor {
    /// Attempts to open a range of memory
    /// for reading and code execution.
    pub fn open_read_execute(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
@@ -183,7 +181,7 @@ impl MemoryEditor {
    /// for reading, writing, and code
    /// execution.
    pub fn open_read_write_execute(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
@@ -194,7 +192,7 @@ impl MemoryEditor {
    /// Attempts to open a range of memory
    /// with all memory access permissions.
    pub fn open_all(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
    ) -> Result<Self> {
       return Self::open_with_permissions(
          address_range,
@@ -225,7 +223,7 @@ impl MemoryEditor {
    ) -> &'l [T] {
       let start      = self.address_range.start;
       let end        = self.address_range.end;
-      let byte_count = end.offset_from(end) as usize;
+      let byte_count = end - start;
 
       return std::slice::from_raw_parts(
          start as * const T,
@@ -254,7 +252,7 @@ impl MemoryEditor {
    ) -> &'l mut [T] {
       let start      = self.address_range.start;
       let end        = self.address_range.end;
-      let byte_count = end.offset_from(end) as usize;
+      let byte_count = end - start;
 
       return std::slice::from_raw_parts_mut(
          start as * mut T,

@@ -1,7 +1,6 @@
 //! crate::memory OS implementations
 //! for Windows.
 
-use core::ffi::c_void;
 use winapi::{
    shared::{
       basetsd::{
@@ -64,12 +63,12 @@ impl MemoryPermissions {
 
 impl MemoryPermissions {
    pub fn set(
-      address_range  : & std::ops::Range<* const c_void>,
+      address_range  : & std::ops::Range<usize>,
       permissions    : & Self,
    ) -> crate::memory::Result<Self> {
       // Get base address and byte count
       let base    = address_range.start;
-      let bytes   = unsafe{address_range.end.offset_from(address_range.start)};
+      let bytes   = address_range.end - address_range.start;
 
       // Attempt to set page permissions
       let mut old_permissions = 0;

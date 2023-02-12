@@ -1,8 +1,6 @@
 //! Module containing memory patching
 //! utilities.
 
-use core::ffi::c_void;
-
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -84,7 +82,7 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// doesn't come with any warranty of any
 /// kind, so don't hold me accountable!
 pub struct Patch {
-   address_range  : std::ops::Range<* const c_void>,
+   address_range  : std::ops::Range<usize>,
    old_bytes      : Vec<u8>,
 }
 
@@ -296,7 +294,7 @@ impl Patch {
    /// See <a href=#patch_safety>Self</a>
    /// for safety concerns.
    pub unsafe fn new<F>(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
       build_patch    : F,
    ) -> Result<Self>
    where F: FnOnce(& mut [u8]) -> Result<()> {
@@ -331,7 +329,7 @@ impl Patch {
    /// See <a href=#patch_safety>Self</a>
    /// for safety concerns.
    pub unsafe fn fill_with_padding<T, U>(
-      address_range  : std::ops::Range<* const c_void>,
+      address_range  : std::ops::Range<usize>,
       slice          : & [T],
       padding        : U,
       alignment      : PatchAlignment,
