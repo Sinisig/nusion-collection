@@ -283,26 +283,69 @@ pub unsafe trait Patch {
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> Result<()>;
 
-   /// Creates a patch from a list of
-   /// bytes.  If the memory offset
-   /// range is a different length to
-   /// the byte slice, an error is
-   /// returned.
-   unsafe fn patch_bytes<R: RangeBounds<usize>>(
+   /// Writes a slice of items to
+   /// a given memory offset range.
+   /// If the item slice is not the
+   /// same size in bytes as the
+   /// memory offset range, an
+   /// error is returned.
+   unsafe fn patch_slice<R, T>(
       & self,
       memory_offset_range  : R,
-      new_bytes            : & [u8],
-   ) -> Result<Self::Container> {
-      return Self::patch(self, memory_offset_range, |old_bytes| {
-         if old_bytes.len() != new_bytes.len() {
+      new_items            : & [T],
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+         T: Clone,
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         let bytes = std::slice::from_raw_parts_mut(
+            bytes.as_mut_ptr() as * mut T,
+            bytes.len() * std::mem::size_of::<T>(),
+         );
+
+         if bytes.len() != new_items.len() {
             return Err(PatchError::LengthMismatch{
-               found    : new_bytes.len(),
-               expected : old_bytes.len(),
+               found    : new_items.len(),
+               expected : bytes.len(),
             });
          }
 
-         old_bytes.copy_from_slice(new_bytes);
+         bytes.clone_from_slice(new_items);
 
+         return Ok(());
+      });
+   }
+
+   /// Writes a slice of items to
+   /// a given memory offset range.
+   /// If the item slice is longer
+   /// than the memory offset range
+   /// in bytes, an error is returned.
+   /// If the item slice is shorter
+   /// than the memory offset range
+   /// in bytes, a padding alignment
+   /// and value is used to fill out
+   /// the leftover bytes.  If there
+   /// are still leftover bytes which
+   /// are too small to fit the padding
+   /// value, an error is returned.
+   unsafe fn patch_padded_slice<R, T, U>(
+      & self,
+      memory_offset_range  : R,
+      new_items            : & [T],
+      padding_alignment    : PatchAlignment,
+      padding_value        : U,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+         T: Clone,
+         U: Clone,
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         padding_alignment.clone_from_slice_with_padding(
+            bytes,
+            new_items,
+            padding_value,
+         )?;
          return Ok(());
       });
    }
