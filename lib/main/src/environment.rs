@@ -277,7 +277,7 @@ impl Environment {
 #[macro_export]
 macro_rules! env {
    () => {
-      $crate::Environment::get()
+      $crate::environment::Environment::get()
    };
 }
 
@@ -285,7 +285,7 @@ macro_rules! env {
 #[macro_export]
 macro_rules! env_mut {
    () => {
-      $crate::Environment::get_mut()
+      $crate::environment::Environment::get_mut()
    };
 }
 
@@ -293,7 +293,7 @@ macro_rules! env_mut {
 #[macro_export]
 macro_rules! try_env {
    () => {
-      $crate::Environment::try_get()
+      $crate::environment::Environment::try_get()
    };
 }
 
@@ -301,7 +301,7 @@ macro_rules! try_env {
 #[macro_export]
 macro_rules! try_env_mut {
    () => {
-      $crate::Environment::try_get_mut()
+      $crate::environment::Environment::try_get_mut()
    };
 }
 

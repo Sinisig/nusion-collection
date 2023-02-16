@@ -18,12 +18,6 @@ pub mod process;
 
 // Public module re-exports
 pub use proc_macros::*;
-pub use environment::{
-   Environment,
-};
-pub use patch::{
-   Patch,
-};
 pub use process::{
    ProcessSnapshot,
    ModuleSnapshot,
