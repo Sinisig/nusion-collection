@@ -1,6 +1,8 @@
 //! Module containing memory patching
 //! utilities.
 
+use std::ops::RangeBounds;
+
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -25,66 +27,6 @@ pub enum PatchError {
 /// A result type returned by patch
 /// functions.
 pub type Result<T> = std::result::Result<T, PatchError>;
-
-/// Struct for creating and storing
-/// various different memory patch
-/// types.  Patched bytes will be
-/// restored to their original values
-/// automatically when going out of
-/// scope via the
-/// <a href=https://doc.rust-lang.org/std/ops/trait.Drop.html>
-/// Drop
-/// </a>
-/// trait.
-///
-/// <h2 id=  patch_note>
-/// <a href=#patch_note>
-/// Note
-/// </a></h2>
-///
-/// Since the patch uses the Drop trait
-/// to automatically clean up memory, a
-/// Patch instance must have a real variable
-/// binding to prevent going out of scope
-/// and calling Drop too early.  This can
-/// be accomplished by assigning a Patch
-/// to a named variable.
-///
-/// <h2 id=  patch_safety>
-/// <a href=#patch_safety>
-/// Safety
-/// </a></h2>
-///
-/// Every function to create a patch
-/// requires quite a bit of care and
-/// attention to prevent catastrophic
-/// memory safety errors and crashes
-/// from regularly occurring due to the
-/// nature of overwriting arbitrary
-/// memory locations with unrelated
-/// byte data.  First, all safety concerns
-/// from nusion_sys::mem::MemoryEditor::data_mut()
-/// apply to every function to create a
-/// patch.  Second, the patch data must
-/// be valid for the context.  For example,
-/// you should never overwrite machine code
-/// with unrelated data.  It should only
-/// be overwrote with machine code which
-/// is valid for the surrounding code.
-/// Some function variants are safer
-/// (with an 'R') than others, such as
-/// those which take a checksum to compare
-/// against.  While they are safer, they
-/// are still wildly unsafe.  This is the
-/// Mariana Trench of undefined behavior,
-/// so make sure to use this module when
-/// sober and well-rested.  This library
-/// doesn't come with any warranty of any
-/// kind, so don't hold me accountable!
-pub struct Patch {
-   address_range  : std::ops::Range<usize>,
-   old_bytes      : Vec<u8>,
-}
 
 /// Enum for representing alignment
 /// of data within a section of memory.
@@ -273,94 +215,96 @@ impl Default for PatchAlignment {
    }
 }
 
-/////////////////////
-// METHODS - Patch //
-/////////////////////
+////////////
+// TRAITS //
+////////////
 
-impl Patch {
-   /// Creates a patch using a user-defined
-   /// closure to write new byte values to
-   /// the memory region.  The closure parameter
-   /// is a mutable byte slice for the memory
-   /// region of the patch.  The closure will
-   /// only be executed after the memory region
-   /// has been successfully opened for reading
-   /// and writing and a backup of the pre-patch
-   /// bytes has been made.
-   /// <h2 id=  patch_new_safety>
-   /// <a href=#patch_new_safety>
-   /// Safety
-   /// </a></h2>
-   /// See <a href=#patch_safety>Self</a>
-   /// for safety concerns.
-   pub unsafe fn new<F>(
-      address_range  : std::ops::Range<usize>,
-      build_patch    : F,
-   ) -> Result<Self>
-   where F: FnOnce(& mut [u8]) -> Result<()> {
-      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
-         address_range.clone(),
-      )?;
+/// Implements various memory patching
+/// functions for a given type.
+///
+/// <h2 id=  patch_safety>
+/// <a href=#patch_safety>
+/// Safety
+/// </a></h2>
+///
+/// This is by far the most unsafe
+/// part of this library.  To put
+/// into perspective, this is about
+/// as unsafe as
+/// <a href=https://doc.rust-lang.org/std/mem/fn.transmute.html>
+/// std::mem::transmute()
+/// </a>, and in many ways even more
+/// unsafe.  In addition to all the
+/// memory safety concerns from transmute,
+/// any of the following will lead
+/// to undefined behavior (usually a
+/// memory access violation crash)
+///
+/// The overwritten memory location
+/// is currently being accessed (race
+/// condition).
+///
+/// The overwritten memory location
+/// is not a valid place to overwrite
+/// with new data.
+///
+/// The data used to overwrite the
+/// memory location is not valid for
+/// its purpose (ex: overwriting code
+/// with non-code).
+///
+/// Any reference to code or data
+/// in the patch data goes out of
+/// scope, either by being dropped
+/// by the compiler or by unloading
+/// the module containing the code
+/// or data.
+pub unsafe trait Patch {
+   /// The container used to store the
+   /// patch metadata.  It is recommended
+   /// to make this container store the
+   /// overwritten byte data and then
+   /// implement the Drop trait to then
+   /// restore the overwritten bytes.
+   type Container;
 
-      let patch = Self{
-         address_range  : address_range,
-         old_bytes      : editor.bytes().to_vec(),
-      };
+   /// Creates a patch at a given
+   /// memory location offset using
+   /// a predicate to write the bytes
+   /// to the memory location.  The
+   /// actual memory address written
+   /// to depends on the implementation
+   /// of the trait.
+   unsafe fn patch<R, P>(
+      & self,
+      memory_offset_range  : R,
+      predicate            : P,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> Result<()>;
 
-      build_patch(editor.bytes_mut())?;
+   /// Creates a patch from a list of
+   /// bytes.  If the memory offset
+   /// range is a different length to
+   /// the byte slice, an error is
+   /// returned.
+   unsafe fn patch_bytes<R: RangeBounds<usize>>(
+      & self,
+      memory_offset_range  : R,
+      new_bytes            : & [u8],
+   ) -> Result<Self::Container> {
+      return Self::patch(self, memory_offset_range, |old_bytes| {
+         if old_bytes.len() != new_bytes.len() {
+            return Err(PatchError::LengthMismatch{
+               found    : new_bytes.len(),
+               expected : old_bytes.len(),
+            });
+         }
 
-      return Ok(patch);
-   }
+         old_bytes.copy_from_slice(new_bytes);
 
-   /// Creates a patch by writing a
-   /// slice of arbitrary elements
-   /// using a byte alignment and
-   /// padding out unfilled data
-   /// with a specified padding value.
-   /// If the slice data is too long
-   /// or there are residual bytes
-   /// left over in the padding,
-   /// an error will be returned.
-   ///
-   /// <h2 id=  patch_patch_safety>
-   /// <a href=#patch_patch_safety>
-   /// Safety
-   /// </a></h2>
-   /// See <a href=#patch_safety>Self</a>
-   /// for safety concerns.
-   pub unsafe fn fill_with_padding<T, U>(
-      address_range  : std::ops::Range<usize>,
-      slice          : & [T],
-      padding        : U,
-      alignment      : PatchAlignment,
-   ) -> Result<Self>
-   where T: Clone,
-         U: Clone, 
-   {
-      return Self::new(address_range, |target| {
-         alignment.clone_from_slice_with_padding(
-            target, slice, padding,
-         )?;
-         Ok(())
+         return Ok(());
       });
-   }
-}
-
-///////////////////////////////////
-// TRAIT IMPLEMENTATIONS - Patch //
-///////////////////////////////////
-
-impl Drop for Patch {
-   fn drop(
-      & mut self,
-   ) {
-      unsafe{crate::sys::memory::MemoryEditor::open_read_write(
-         self.address_range.clone(),
-      ).expect(
-         "Failed to restore patched bytes",
-      ).bytes_mut()}.copy_from_slice(&self.old_bytes);
-
-      return;
    }
 }
 
