@@ -298,9 +298,9 @@ pub unsafe trait Patch {
          T: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         let bytes = std::slice::from_raw_parts_mut(
-            bytes.as_mut_ptr() as * mut T,
-            bytes.len() * std::mem::size_of::<T>(),
+         let new_items = std::slice::from_raw_parts(
+            new_items.as_ptr() as * const u8,
+            new_items.len() * std::mem::size_of::<T>(),
          );
 
          if bytes.len() != new_items.len() {
