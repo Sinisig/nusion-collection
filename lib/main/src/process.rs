@@ -33,6 +33,15 @@ pub struct ModuleSnapshot {
    snap  : crate::sys::process::ModuleSnapshot,
 }
 
+/// A memory patch acting on a module
+/// snapshot.  Patched bytes are restored
+/// to their original bytes when the
+/// container is dropped.
+pub struct ModuleSnapshotPatchContainer {
+   address_range  : std::ops::Range<usize>,
+   old_bytes      : Vec<u8>,
+}
+
 /// A list of process snapshots.  Useful
 /// for enumerating and searching the
 /// entire system process tree.
@@ -155,6 +164,85 @@ impl ModuleSnapshot {
       &'l self,
    ) -> &'l str {
       return self.snap.executable_file_name();
+   }
+}
+
+////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ModuleSnapshot //
+////////////////////////////////////////////
+
+unsafe impl crate::patch::Patch for ModuleSnapshot {
+   type Container = ModuleSnapshotPatchContainer;
+
+   /// Patches using an offset in the
+   /// module's address space.  See
+   /// the Patch trait for more
+   /// documentation.
+   unsafe fn patch<R, P>(
+      & self,
+      memory_offset_range  : R,
+      predicate            : P,
+   ) -> crate::patch::Result<Self::Container>
+   where R: std::ops::RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   {
+      // Map input offset range into real address range
+      let base_address = self.address_range().start;
+
+      use std::ops::Bound;
+      let lower_bound = match memory_offset_range.start_bound() {
+         Bound::Included(b)
+            => base_address + *b,
+         Bound::Excluded(b)
+            => base_address + *b + 1,
+         Bound::Unbounded
+            => base_address,
+      };
+      let upper_bound = match memory_offset_range.end_bound() {
+         Bound::Included(b)
+            => base_address + *b + 1,
+         Bound::Excluded(b)
+            => base_address + *b,
+         Bound::Unbounded
+            => self.address_range().end,
+      };
+
+      let memory_address_range = lower_bound..upper_bound;
+
+      // Open the range for reading/writing
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         memory_address_range.clone(),
+      )?;
+
+      // Store the old bytes in a new container
+      let container = Self::Container{
+         address_range  : memory_address_range.clone(),
+         old_bytes      : editor.bytes_mut().to_vec(),
+      };
+
+      // Run the closure to patch the bytes
+      predicate(editor.bytes_mut())?;
+
+      // Return success
+      return Ok(container);
+   }
+}
+
+//////////////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ModuleSnapshotPatchContainer //
+//////////////////////////////////////////////////////////
+
+impl std::ops::Drop for ModuleSnapshotPatchContainer {
+   fn drop(
+      & mut self,
+   ) {
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         self.address_range.clone(),
+      ).expect("Failed to restore patched module bytes");
+
+      unsafe{editor.bytes_mut().copy_from_slice(&self.old_bytes)};
+
+      return;
    }
 }
 
