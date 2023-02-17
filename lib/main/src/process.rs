@@ -179,7 +179,7 @@ unsafe impl crate::patch::Patch for ModuleSnapshot {
    /// the Patch trait for more
    /// documentation.
    unsafe fn patch<R, P>(
-      & self,
+      & mut self,
       memory_offset_range  : R,
       predicate            : P,
    ) -> crate::patch::Result<Self::Container>

@@ -276,7 +276,7 @@ pub unsafe trait Patch {
    /// to depends on the implementation
    /// of the trait.
    unsafe fn patch<R, P>(
-      & self,
+      & mut self,
       memory_offset_range  : R,
       predicate            : P,
    ) -> Result<Self::Container>
@@ -290,27 +290,27 @@ pub unsafe trait Patch {
    /// memory offset range, an
    /// error is returned.
    unsafe fn patch_slice<R, T>(
-      & self,
+      & mut self,
       memory_offset_range  : R,
-      new_items            : & [T],
+      items                : & [T],
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
          T: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         let new_items = std::slice::from_raw_parts(
-            new_items.as_ptr() as * const u8,
-            new_items.len() * std::mem::size_of::<T>(),
+         let items = std::slice::from_raw_parts(
+            items.as_ptr() as * const u8,
+            items.len() * std::mem::size_of::<T>(),
          );
 
-         if bytes.len() != new_items.len() {
+         if bytes.len() != items.len() {
             return Err(PatchError::LengthMismatch{
-               found    : new_items.len(),
+               found    : items.len(),
                expected : bytes.len(),
             });
          }
 
-         bytes.clone_from_slice(new_items);
+         bytes.clone_from_slice(items);
 
          return Ok(());
       });
@@ -330,22 +330,88 @@ pub unsafe trait Patch {
    /// are too small to fit the padding
    /// value, an error is returned.
    unsafe fn patch_padded_slice<R, T, U>(
-      & self,
+      & mut self,
       memory_offset_range  : R,
-      new_items            : & [T],
-      padding_alignment    : PatchAlignment,
-      padding_value        : U,
+      items                : & [T],
+      alignment            : PatchAlignment,
+      padding              : U,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
          T: Clone,
          U: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         padding_alignment.clone_from_slice_with_padding(
+         alignment.clone_from_slice_with_padding(
             bytes,
-            new_items,
-            padding_value,
+            items,
+            padding,
          )?;
+         return Ok(());
+      });
+   }
+
+   /// Writes a single item to a
+   /// given memory offset range.
+   /// If the length of the item
+   /// in bytes doesn't match the
+   /// memory offset range, an
+   /// error will be returned.
+   unsafe fn patch_item<R, T>(
+      & mut self,
+      memory_offset_range  : R,
+      item                 : T,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         let item_size = std::mem::size_of::<T>();
+
+         if bytes.len() != item_size {
+            return Err(PatchError::LengthMismatch{
+               found    : bytes.len(),
+               expected : item_size,
+            });
+         }
+
+         let destination = bytes.as_mut_ptr() as * mut T;
+
+         *destination = item;
+
+         return Ok(());
+      });
+   }
+
+   /// Fills a region of memory
+   /// with a single repeated value.
+   /// If there are unfillable bytes
+   /// which are unable to fully contain
+   /// a copy of the item, an error
+   /// is returned.
+   unsafe fn patch_item_fill<R, T>(
+      & mut self,
+      memory_offset_range  : R,
+      item                 : T,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+         T: Clone,
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         let residual = bytes.len() % std::mem::size_of::<T>();
+
+         if residual != 0 {
+            return Err(PatchError::ResidualBytes{
+               left  : 0,
+               right : residual,
+            });
+         }
+
+         let bytes = std::slice::from_raw_parts_mut(
+            bytes.as_mut_ptr() as * mut T,
+            bytes.len() / std::mem::size_of::<T>(),
+         );
+
+         bytes.fill(item);
+
          return Ok(());
       });
    }
