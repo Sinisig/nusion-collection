@@ -6,13 +6,12 @@ use nusion_proc_macros  as proc_macros;
 use nusion_sys          as sys;
 
 // Public-internal module re-exports
-pub use sys::osapi               as __osapi;
-pub use sys::build_slib_entry    as __build_slib_entry;
-pub use sys::os_build_slib_entry as __os_build_slib_entry;
+pub use sys::osapi as __osapi;
 
 // Public modules
 pub mod console;
 pub mod environment;
+pub mod macros;
 pub mod patch;
 pub mod process;
 

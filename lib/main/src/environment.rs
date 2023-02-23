@@ -269,42 +269,6 @@ impl Environment {
    }
 }
 
-//////////////////////////
-// MACROS - Environment //
-//////////////////////////
-
-/// Shorthand for nusion::Environment::get().
-#[macro_export]
-macro_rules! env {
-   () => {
-      $crate::environment::Environment::get()
-   };
-}
-
-/// Shorthand for nusion::Environment::get_mut().
-#[macro_export]
-macro_rules! env_mut {
-   () => {
-      $crate::environment::Environment::get_mut()
-   };
-}
-
-/// Shorthand for nusion::Environment::try_get().
-#[macro_export]
-macro_rules! try_env {
-   () => {
-      $crate::environment::Environment::try_get()
-   };
-}
-
-/// Shorthand for nusion::Environment::try_env_mut().
-#[macro_export]
-macro_rules! try_env_mut {
-   () => {
-      $crate::environment::Environment::try_get_mut()
-   };
-}
-
 //////////////////////////////////
 // MAIN EXECUTORS - Environment //
 //////////////////////////////////
@@ -400,7 +364,7 @@ impl Environment {
    /// This function should never be called directly.
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
-   pub fn start_main_void<F>(
+   pub fn __start_main_void<F>(
       entrypoint  : F,
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce(),
@@ -424,7 +388,7 @@ impl Environment {
    /// This function should never be called directly.
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
-   pub fn start_main_result_static<F, E>(
+   pub fn __start_main_result_static<F, E>(
       entrypoint  : F,
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), E>,
@@ -449,7 +413,7 @@ impl Environment {
    /// This function should never be called directly.
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
-   pub fn start_main_result_dynamic<F>(
+   pub fn __start_main_result_dynamic<F>(
       entrypoint  : F,
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,

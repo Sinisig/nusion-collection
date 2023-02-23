@@ -16,7 +16,6 @@ pub use os::osapi as osapi;
 // Public modules
 pub mod console;
 pub mod environment;
-pub mod macros;
 pub mod memory;
 pub mod process;
 

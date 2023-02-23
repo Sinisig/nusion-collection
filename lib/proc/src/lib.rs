@@ -183,7 +183,7 @@ pub fn entry(
 
    // Format entry point constrution
    let slib_entry : proc_macro::TokenStream = format!(r"
-      nusion::__build_slib_entry!({identifier}, {return_type});
+      nusion::__build_entry!({identifier}, {return_type});
    ").parse().unwrap();
 
    // Prepend entrypoint to user entrypoint function and return
