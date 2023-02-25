@@ -1,6 +1,7 @@
 //! Module containing memory patching
 //! utilities.
 
+use core::ffi::c_void;
 use std::ops::RangeBounds;
 
 //////////////////////
@@ -233,9 +234,114 @@ impl Default for PatchAlignment {
    }
 }
 
-////////////
-// TRAITS //
-////////////
+//////////////////////////////
+// INTERNAL HELPERS - Patch //
+//////////////////////////////
+
+unsafe fn patch_buffer_item<T>(
+   buffer   : & mut [u8],
+   item     : T,
+) -> Result<()> {
+   let item_size = std::mem::size_of::<T>();
+
+   if buffer.len() != item_size {
+      return Err(PatchError::LengthMismatch{
+         found    : buffer.len(),
+         expected : item_size,
+      });
+   }
+
+   let destination = buffer.as_mut_ptr() as * mut T;
+
+   *destination = item;
+
+   return Ok(());
+}
+
+unsafe fn patch_buffer_item_fill<T>(
+   buffer   : & mut [u8],
+   item     : T,
+) -> Result<()>
+where T: Clone,
+{
+   let residual = buffer.len() % std::mem::size_of::<T>();
+
+   if residual != 0 {
+      return Err(PatchError::ResidualBytes{
+         left  : 0,
+         right : residual,
+      });
+   }
+
+   let bytes = std::slice::from_raw_parts_mut(
+      buffer.as_mut_ptr() as * mut T,
+      buffer.len() / std::mem::size_of::<T>(),
+   );
+
+   bytes.fill(item);
+
+   return Ok(());
+}
+
+unsafe fn patch_buffer_slice<T>(
+   buffer   : & mut [u8],
+   items    : & [T],
+) -> Result<()>
+where T: Clone,
+{
+   let items = std::slice::from_raw_parts(
+      items.as_ptr() as * const u8,
+      items.len() * std::mem::size_of::<T>(),
+   );
+
+   if buffer.len() != items.len() {
+      return Err(PatchError::LengthMismatch{
+         found    : items.len(),
+         expected : buffer.len(),
+      });
+   }
+
+   buffer.clone_from_slice(items);
+
+   return Ok(());
+}
+
+unsafe fn patch_buffer_slice_padded<T, U>(
+   buffer      : & mut [u8],
+   items       : & [T],
+   alignment   : PatchAlignment,
+   padding     : U,
+) -> Result<()>
+where T: Clone,
+      U: Clone,
+{
+   alignment.clone_from_slice_with_padding(
+      buffer,
+      items,
+      padding,
+   )?;
+
+   return Ok(());
+}
+
+unsafe fn patch_buffer_nop(
+   buffer   : & mut [u8],
+) -> Result<()> {
+   crate::sys::compiler::nop_fill(buffer)?;
+   return Ok(());
+}
+
+unsafe fn patch_buffer_hook(
+   buffer               : & mut [u8],
+   target_code_location : * const c_void,
+) -> Result<()> {
+   crate::sys::compiler::hook_fill(buffer, target_code_location)?;
+   return Ok(());
+}
+
+//////////////////////////////
+// TRAIT DEFINITION - Patch //
+//////////////////////////////
 
 /// Implements various memory patching
 /// functions for a given type.
@@ -315,19 +421,7 @@ pub unsafe trait Patch {
    where R: RangeBounds<usize>,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         let item_size = std::mem::size_of::<T>();
-
-         if bytes.len() != item_size {
-            return Err(PatchError::LengthMismatch{
-               found    : bytes.len(),
-               expected : item_size,
-            });
-         }
-
-         let destination = bytes.as_mut_ptr() as * mut T;
-
-         *destination = item;
-
+         patch_buffer_item(bytes, item)?;
          return Ok(());
       });
    }
@@ -347,22 +441,7 @@ pub unsafe trait Patch {
          T: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         let residual = bytes.len() % std::mem::size_of::<T>();
-
-         if residual != 0 {
-            return Err(PatchError::ResidualBytes{
-               left  : 0,
-               right : residual,
-            });
-         }
-
-         let bytes = std::slice::from_raw_parts_mut(
-            bytes.as_mut_ptr() as * mut T,
-            bytes.len() / std::mem::size_of::<T>(),
-         );
-
-         bytes.fill(item);
-
+         patch_buffer_item_fill(bytes, item)?;
          return Ok(());
       });
    }
@@ -382,20 +461,7 @@ pub unsafe trait Patch {
          T: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         let items = std::slice::from_raw_parts(
-            items.as_ptr() as * const u8,
-            items.len() * std::mem::size_of::<T>(),
-         );
-
-         if bytes.len() != items.len() {
-            return Err(PatchError::LengthMismatch{
-               found    : items.len(),
-               expected : bytes.len(),
-            });
-         }
-
-         bytes.clone_from_slice(items);
-
+         patch_buffer_slice(bytes, items)?;
          return Ok(());
       });
    }
@@ -425,11 +491,7 @@ pub unsafe trait Patch {
          U: Clone,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         alignment.clone_from_slice_with_padding(
-            bytes,
-            items,
-            padding,
-         )?;
+         patch_buffer_slice_padded(bytes, items, alignment, padding)?;
          return Ok(());
       });
    }
@@ -447,7 +509,7 @@ pub unsafe trait Patch {
    where R: RangeBounds<usize>
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         crate::sys::compiler::nop_fill(bytes)?;
+         patch_buffer_nop(bytes)?;
          return Ok(());
       });
    }
@@ -463,12 +525,12 @@ pub unsafe trait Patch {
    unsafe fn patch_hook<R>(
       & mut self,
       memory_offset_range  : R,
-      target_code_location : * const core::ffi::c_void,
+      target_code_location : * const c_void,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
    {
       return Self::patch(self, memory_offset_range, |bytes| {
-         crate::sys::compiler::hook_fill(bytes, target_code_location)?;
+         patch_buffer_hook(bytes, target_code_location)?;
          return Ok(());
       });
    }

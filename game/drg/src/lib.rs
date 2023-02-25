@@ -46,6 +46,16 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
 
+   // !!! TEST CODE, REMOVE THIS !!!
+   use nusion::Patch;
+   let _patch = unsafe{game!()?.patch_slice_padded(
+      0x14D7FBD..0x14D7FC6,
+      &[0xDE, 0xAD],
+      nusion::PatchAlignment::Center,
+      0x90u8,
+   )};
+   // !!! TEST CODE, REMOVE THIS !!!
+
    std::thread::sleep(std::time::Duration::from_secs(5));
    return Ok(());
 }
