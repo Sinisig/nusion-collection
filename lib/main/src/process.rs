@@ -317,6 +317,15 @@ impl ProcessSnapshotList {
       return self.processes.get(executable_file_name);
    } 
 
+   /// Tries to find a mutable process
+   /// by its executable file name.
+   pub fn find_mut_by_executable_file_name(
+      & mut self,
+      executable_file_name : & str,
+   ) -> Option<& mut ProcessSnapshot> {
+      return self.processes.get_mut(executable_file_name);
+   }
+
    /// Creates an iterator over the
    /// processes in the list.
    pub fn iter<'l>(
@@ -415,6 +424,15 @@ impl ModuleSnapshotList {
       executable_file_name : & str,
    ) -> Option<& ModuleSnapshot> {
       return self.modules.get(executable_file_name);
+   }
+
+   /// Tries to find a mutable module
+   /// by its executable file name.
+   pub fn find_mut_by_executable_file_name(
+      & mut self,
+      executable_file_name : & str,
+   ) -> Option<& mut ModuleSnapshot> {
+      return self.modules.get_mut(executable_file_name);
    }
 
    /// Returns a reference to the process

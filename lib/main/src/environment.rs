@@ -250,6 +250,14 @@ impl Environment {
       return &self.modules;
    }
 
+   /// Gets a mutable reference to the
+   /// stored module list for the process.
+   pub fn modules_mut<'l>(
+      &'l mut self,
+   ) -> &'l mut crate::process::ModuleSnapshotList {
+      return & mut self.modules;
+   }
+
    /// Refreshes the module list for
    /// the current process in case any
    /// other modules were loaded or

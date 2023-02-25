@@ -22,6 +22,9 @@ pub enum PatchError {
       left        : usize,
       right       : usize,
    },
+   CompilationError{
+      sys_error   : crate::sys::compiler::CompilationError,
+   },
 }
 
 /// A result type returned by patch
@@ -63,12 +66,14 @@ impl std::fmt::Display for PatchError {
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
       return match self {
-         Self::MemoryError    {sys_error,       }
+         Self::MemoryError       {sys_error,       }
             => write!(stream, "Memory error: {sys_error}",                          ),
-         Self::LengthMismatch {found, expected, }
+         Self::LengthMismatch    {found, expected, }
             => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
-         Self::ResidualBytes  {left, right,     }
+         Self::ResidualBytes     {left, right,     }
             => write!(stream, "Residual bytes: {left} on left, {right} on right"),
+         Self::CompilationError  {sys_error,       }
+            => write!(stream, "Compilation error: {sys_error}"),
       };
    }
 }
@@ -78,9 +83,19 @@ impl std::error::Error for PatchError {
 
 impl From<crate::sys::memory::MemoryError> for PatchError {
    fn from(
-      value : crate::sys::memory::MemoryError
+      value : crate::sys::memory::MemoryError,
    ) -> Self {
       return Self::MemoryError{
+         sys_error : value,
+      };
+   }
+}
+
+impl From<crate::sys::compiler::CompilationError> for PatchError {
+   fn from(
+      value : crate::sys::compiler::CompilationError,
+   ) -> Self {
+      return Self::CompilationError{
          sys_error : value,
       };
    }
@@ -417,6 +432,45 @@ pub unsafe trait Patch {
          )?;
          return Ok(());
       });
-   } 
+   }
+
+   /// Compiles a block of architecture
+   /// no-operation instructions to fill
+   /// the memory region.  The function
+   /// will return an error if no possible
+   /// instruction encodings can fill the
+   /// entire memory region.
+   unsafe fn patch_nop<R>(
+      & mut self,
+      memory_offset_range  : R,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         crate::sys::compiler::nop_fill(bytes)?;
+         return Ok(());
+      });
+   }
+
+   /// Compiles a jump to a given
+   /// code location, padding the
+   /// rest of the memory region with
+   /// architecture-dependent no-operation
+   /// instructions.  The function will
+   /// return an error if no possible
+   /// instruction encoding can fit
+   /// within the memory region.
+   unsafe fn patch_hook<R, F>(
+      & mut self,
+      memory_offset_range  : R,
+      target_code_location : * const core::ffi::c_void,
+   ) -> Result<Self::Container>
+   where R: RangeBounds<usize>,
+   {
+      return Self::patch(self, memory_offset_range, |bytes| {
+         crate::sys::compiler::hook_fill(bytes, target_code_location)?;
+         return Ok(());
+      });
+   }
 }
 
