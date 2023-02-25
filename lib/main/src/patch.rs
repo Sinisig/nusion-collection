@@ -460,7 +460,7 @@ pub unsafe trait Patch {
    /// return an error if no possible
    /// instruction encoding can fit
    /// within the memory region.
-   unsafe fn patch_hook<R, F>(
+   unsafe fn patch_hook<R>(
       & mut self,
       memory_offset_range  : R,
       target_code_location : * const core::ffi::c_void,

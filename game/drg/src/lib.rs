@@ -7,6 +7,26 @@ macro_rules! game {
    }
 }
 
+#[derive(Debug)]
+enum MainError {
+   WrongProcess,
+}
+
+impl std::fmt::Display for MainError {
+   fn fmt(
+      & self,
+      stream : & mut std::fmt::Formatter<'_>,
+   ) -> std::fmt::Result {
+      return write!(stream, "{}", match self {
+         Self::WrongProcess
+            => "Process is not Deep Rock Galactic",
+      });
+   }
+}
+
+impl std::error::Error for MainError {
+}
+
 #[nusion::entry]
 pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    nusion::env_mut!().console_mut().set_title(
@@ -28,25 +48,5 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
 
    std::thread::sleep(std::time::Duration::from_secs(5));
    return Ok(());
-}
-
-#[derive(Debug)]
-enum MainError {
-   WrongProcess,
-}
-
-impl std::fmt::Display for MainError {
-   fn fmt(
-      & self,
-      stream : & mut std::fmt::Formatter<'_>,
-   ) -> std::fmt::Result {
-      return write!(stream, "{}", match self {
-         Self::WrongProcess
-            => "Process is not Deep Rock Galactic",
-      });
-   }
-}
-
-impl std::error::Error for MainError {
 }
 

@@ -7,8 +7,9 @@
 #[derive(Debug)]
 pub enum CompilationError {
    ImpossibleEncoding,
-   ResidualBytes{
-      bytes : usize,
+   BufferTooSmall{
+      inst_len : usize,
+      buff_len : usize,
    },
 }
 
@@ -26,8 +27,8 @@ impl std::fmt::Display for CompilationError {
       return match self {
          Self::ImpossibleEncoding
             => write!(stream, "Impossible instruction encoding"),
-         Self::ResidualBytes  {bytes}
-            => write!(stream, "Residual bytes in block: {bytes}"),
+         Self::BufferTooSmall {inst_len, buff_len}
+            => write!(stream, "Buffer is too small for instruction encoding: Requires at least {inst_len}, found {buff_len}"),
       };
    }
 }
