@@ -38,7 +38,7 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// a byte slice should be positioned
 /// within a larger section of memory.
 #[derive(Debug)]
-pub enum PatchAlignment {
+pub enum Alignment {
    Left,
    LeftOffset{
       elements : usize,
@@ -102,11 +102,11 @@ impl From<crate::sys::compiler::CompilationError> for PatchError {
    }
 }
 
-//////////////////////////////
-// METHODS - PatchAlignment //
-//////////////////////////////
+/////////////////////////
+// METHODS - Alignment //
+/////////////////////////
 
-impl PatchAlignment {
+impl Alignment {
    /// Returns the amount of left
    /// and right padding to insert
    /// given a buffer byte count
@@ -224,11 +224,11 @@ impl PatchAlignment {
    }
 }
 
-////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - PatchAlignment //
-////////////////////////////////////////////
+///////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - Alignment //
+///////////////////////////////////////
 
-impl Default for PatchAlignment {
+impl Default for Alignment {
    fn default() -> Self {
       return Self::Center;
    }
@@ -309,7 +309,7 @@ where T: Clone,
 unsafe fn patch_buffer_slice_padded<T, U>(
    buffer      : & mut [u8],
    items       : & [T],
-   alignment   : PatchAlignment,
+   alignment   : Alignment,
    padding     : U,
 ) -> Result<()>
 where T: Clone,
@@ -483,7 +483,7 @@ pub unsafe trait Patch {
       & mut self,
       memory_offset_range  : R,
       items                : & [T],
-      alignment            : PatchAlignment,
+      alignment            : Alignment,
       padding              : U,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,

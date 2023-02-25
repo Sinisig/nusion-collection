@@ -17,10 +17,6 @@ pub mod process;
 
 // Public module re-exports
 pub use proc_macros::*;
-pub use patch::{
-   PatchAlignment,
-   Patch,
-};
 pub use process::{
    ProcessSnapshot,
    ModuleSnapshot,

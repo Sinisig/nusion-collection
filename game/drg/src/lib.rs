@@ -47,11 +47,11 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    );
 
    // !!! TEST CODE, REMOVE THIS !!!
-   use nusion::Patch;
+   use nusion::patch::Patch;
    let _patch = unsafe{game!()?.patch_slice_padded(
       0x14D7FBD..0x14D7FC6,
       &[0xDE, 0xAD],
-      nusion::PatchAlignment::Center,
+      nusion::patch::Alignment::Center,
       0x90u8,
    )};
    // !!! TEST CODE, REMOVE THIS !!!
