@@ -3,6 +3,7 @@
 //! processes and their loaded libraries.
 
 use std::collections::hash_map::HashMap;
+use std::ops::RangeBounds;
 
 //////////////////////
 // TYPE DEFINITIONS //
@@ -167,31 +168,22 @@ impl ModuleSnapshot {
    }
 }
 
-////////////////////////////////////////////
-// TRAIT IMPLEMENTATIONS - ModuleSnapshot //
-////////////////////////////////////////////
+///////////////////////////////////////
+// INTERNAL HELPERS - ModuleSnapshot //
+///////////////////////////////////////
 
-/*
-impl crate::patch::Patch for ModuleSnapshot {
-   type Container = ModuleSnapshotPatchContainer;
-
-   /// Patches using an offset in the
-   /// module's address space.  See
-   /// the Patch trait for more
-   /// documentation.
-   unsafe fn patch_with<R, P>(
-      & mut self,
-      memory_offset_range  : R,
-      predicate            : P,
-   ) -> crate::patch::Result<Self::Container>
-   where R: std::ops::RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+impl ModuleSnapshot {
+   fn offset_range_to_address_range<R>(
+      & self,
+      offset_range   : R,
+   ) -> std::ops::Range<usize>
+   where R: RangeBounds<usize>,
    {
-      // Map input offset range into real address range
-      let base_address = self.address_range().start;
+      let base_address  = self.address_range().start;
+      let end_address   = self.address_range().end;
 
       use std::ops::Bound;
-      let lower_bound = match memory_offset_range.start_bound() {
+      let lower_bound = match offset_range.start_bound() {
          Bound::Included(b)
             => base_address + *b,
          Bound::Excluded(b)
@@ -199,36 +191,213 @@ impl crate::patch::Patch for ModuleSnapshot {
          Bound::Unbounded
             => base_address,
       };
-      let upper_bound = match memory_offset_range.end_bound() {
+      let upper_bound = match offset_range.end_bound() {
          Bound::Included(b)
             => base_address + *b + 1,
          Bound::Excluded(b)
             => base_address + *b,
          Bound::Unbounded
-            => self.address_range().end,
+            => end_address,
       };
 
-      let memory_address_range = lower_bound..upper_bound;
+      return lower_bound..upper_bound;
+   }
+}
 
-      // Open the range for reading/writing
-      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
-         memory_address_range.clone(),
+////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - ModuleSnapshot //
+////////////////////////////////////////////
+
+impl crate::patch::Patch for ModuleSnapshot {
+   type Container = ModuleSnapshotPatchContainer;
+
+   unsafe fn patch_read_item<R, T>(
+      & self,
+      memory_range   : R,
+   ) -> crate::patch::Result<T>
+   where R: RangeBounds<usize>,
+         T: Copy,
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let item_byte_len = std::mem::size_of::<T>();
+
+      let editor = crate::sys::memory::MemoryEditor::open_read(
+         address_range,
       )?;
 
-      // Store the old bytes in a new container
+      let bytes = editor.bytes();
+
+      if bytes.len() != item_byte_len {
+         return Err(crate::patch::PatchError::LengthMismatch{
+            found    : bytes.len(),
+            expected : item_byte_len,
+         });
+      }
+
+      let item_ptr = bytes.as_ptr() as * const T;
+
+      let item = *item_ptr;
+
+      return Ok(item);
+   }
+
+   unsafe fn patch_read_slice<R, T>(
+      & self,
+      memory_range   : R,
+   ) -> crate::patch::Result<Vec<T>>
+   where R: RangeBounds<usize>,
+         T: Copy,
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let item_byte_len = std::mem::size_of::<T>();
+
+      let editor = crate::sys::memory::MemoryEditor::open_read(
+         address_range,
+      )?;
+
+      let bytes = editor.bytes();
+
+      // Done like this because we want to allow
+      // zero-length type reads on zero-length
+      // memory ranges.  Seems weird, but theoretically
+      // could be used to test memory reading and
+      // handling the return type.  This makes
+      // more sense IMO to users.
+      if bytes.len() != 0 && item_byte_len == 0 {
+         return Err(crate::patch::PatchError::ZeroLengthType);
+      }
+
+      if bytes.len() % item_byte_len != 0 {
+         return Err(crate::patch::PatchError::ResidualBytes{
+            left  : 0,
+            right : bytes.len() % item_byte_len,
+         });
+      }
+
+      let slice = std::slice::from_raw_parts(
+         bytes.as_ptr() as * const T,
+         bytes.len() / item_byte_len,
+      );
+
+      return Ok(slice.to_vec());
+   }
+
+   unsafe fn patch_write_with<R, P>(
+      & mut self,
+      memory_range   : R,
+      checksum       : crate::patch::Checksum,
+      predicate      : P,
+   ) -> crate::patch::Result<()>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         address_range,
+      )?;
+
+      let bytes = editor.bytes_mut();
+
+      let bytes_checksum = crate::patch::Checksum::new(bytes);
+
+      if bytes_checksum != checksum {
+         return Err(crate::patch::PatchError::ChecksumMismatch{
+            found    : bytes_checksum,
+            expected : checksum,
+         });
+      }
+
+      predicate(bytes)?;
+
+      return Ok(());
+   }
+
+   unsafe fn patch_write_unchecked_with<R, P>(
+      & mut self,
+      memory_range   : R,
+      predicate      : P,
+   ) -> crate::patch::Result<()>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         address_range,
+      )?;
+
+      let bytes = editor.bytes_mut();
+
+      predicate(bytes)?;
+
+      return Ok(());
+   }
+
+   unsafe fn patch_create_with<R, P>(
+      & mut self,
+      memory_range   : R,
+      checksum       : crate::patch::Checksum,
+      predicate      : P,
+   ) -> crate::patch::Result<Self::Container>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         address_range.clone(),
+      )?;
+
+      let bytes = editor.bytes_mut();
+
+      let bytes_checksum = crate::patch::Checksum::new(bytes);
+
+      if bytes_checksum != checksum {
+         return Err(crate::patch::PatchError::ChecksumMismatch{
+            found    : bytes_checksum,
+            expected : checksum,
+         });
+      }
+
       let container = Self::Container{
-         address_range  : memory_address_range.clone(),
-         old_bytes      : editor.bytes_mut().to_vec(),
+         address_range  : address_range,
+         old_bytes      : bytes.to_vec(),
       };
 
-      // Run the closure to patch the bytes
-      predicate(editor.bytes_mut())?;
+      predicate(bytes)?;
 
-      // Return success
+      return Ok(container);
+   }
+
+   unsafe fn patch_create_unchecked_with<R, P>(
+      & mut self,
+      memory_range   : R,
+      predicate      : P,
+   ) -> crate::patch::Result<Self::Container>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   {
+      let address_range = self.offset_range_to_address_range(memory_range);
+
+      let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
+         address_range.clone(),
+      )?;
+
+      let bytes = editor.bytes_mut();
+
+      let container = Self::Container{
+         address_range  : address_range,
+         old_bytes      : bytes.to_vec(),
+      };
+
+      predicate(bytes)?;
+
       return Ok(container);
    }
 }
-*/
 
 //////////////////////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ModuleSnapshotPatchContainer //

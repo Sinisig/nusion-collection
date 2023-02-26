@@ -30,6 +30,7 @@ pub enum PatchError {
       found       : Checksum,
       expected    : Checksum,
    },
+   ZeroLengthType,
 }
 
 /// A result type returned by patch
@@ -88,6 +89,8 @@ impl std::fmt::Display for PatchError {
             => write!(stream, "Compilation error: {sys_error}"),
          Self::ChecksumMismatch  {found, expected, }
             => write!(stream, "Checksum mismatch: Found {found}, expected {expected}"),
+         Self::ZeroLengthType
+            => write!(stream, "Type has zero length for non-zero range length"),
       };
    }
 }
@@ -460,6 +463,10 @@ unsafe fn patch_buffer_hook(
 /// </li>
 /// </ul>
 pub trait Patch {
+   ////////////////////
+   // REQUIRED ITEMS //
+   ////////////////////
+
    /// The container used to store the
    /// patch metadata.  It is recommended
    /// to make this container store the
@@ -471,23 +478,26 @@ pub trait Patch {
    /// Reads the bytes stored in the
    /// memory range as a single value.
    unsafe fn patch_read_item<R, T>(
+      & self,
       memory_range   : R,
    ) -> Result<T>
    where R: RangeBounds<usize>,
-         T: Clone;
+         T: Copy;
 
    /// Reads the bytes stored in the
    /// memory range as a slice of values.
    unsafe fn patch_read_slice<R, T>(
+      & self,
       memory_range   : R,
    ) -> Result<Vec<T>>
    where R: RangeBounds<usize>,
-         T: Clone;
+         T: Copy;
 
    /// Writes values to a memory range
    /// using a predicate, checking
    /// against a checksum.
    unsafe fn patch_write_with<R, P>(
+      & mut self,
       memory_range   : R,
       checksum       : Checksum,
       predicate      : P,
@@ -499,6 +509,7 @@ pub trait Patch {
    /// using a predicate without checking
    /// against a checksum.
    unsafe fn patch_write_unchecked_with<R, P>(
+      & mut self,
       memory_range   : R,
       predicate      : P,
    ) -> Result<()>
@@ -510,6 +521,7 @@ pub trait Patch {
    /// against a checksum and storing
    /// the old bytes in Self::Container.
    unsafe fn patch_create_with<R, P>(
+      & mut self,
       memory_range   : R,
       checksum       : Checksum,
       predicate      : P,
@@ -523,10 +535,17 @@ pub trait Patch {
    /// without checking against a
    /// checksum.
    unsafe fn patch_create_unchecked_with<R, P>(
+      & mut self,
       memory_range   : R,
       predicate      : P,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> Result<()>;
+
+   ////////////////////
+   // PROVIDED ITEMS //
+   ////////////////////
+
+   // TODO: Re-implement patch methods
 }
 
