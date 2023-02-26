@@ -2,7 +2,7 @@
 name        = "nusion-sys"
 description = "System abstractions used by nusion."
 authors     = ["Sinisig"]
-version     = "0.1.4+alpha"
+version     = "0.2.0+alpha"
 edition     = "2021"
 
 [target.'cfg(windows)'.dependencies.winapi]
