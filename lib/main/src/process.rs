@@ -171,14 +171,15 @@ impl ModuleSnapshot {
 // TRAIT IMPLEMENTATIONS - ModuleSnapshot //
 ////////////////////////////////////////////
 
-unsafe impl crate::patch::Patch for ModuleSnapshot {
+/*
+impl crate::patch::Patch for ModuleSnapshot {
    type Container = ModuleSnapshotPatchContainer;
 
    /// Patches using an offset in the
    /// module's address space.  See
    /// the Patch trait for more
    /// documentation.
-   unsafe fn patch<R, P>(
+   unsafe fn patch_with<R, P>(
       & mut self,
       memory_offset_range  : R,
       predicate            : P,
@@ -227,6 +228,7 @@ unsafe impl crate::patch::Patch for ModuleSnapshot {
       return Ok(container);
    }
 }
+*/
 
 //////////////////////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ModuleSnapshotPatchContainer //

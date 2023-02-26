@@ -26,6 +26,10 @@ pub enum PatchError {
    CompilationError{
       sys_error   : crate::sys::compiler::CompilationError,
    },
+   ChecksumMismatch{
+      found       : Checksum,
+      expected    : Checksum,
+   },
 }
 
 /// A result type returned by patch
@@ -57,6 +61,13 @@ pub enum Alignment {
    CenterByte,
 }
 
+/// Struct for storing and verifying
+/// stored byte data for a patch.
+#[derive(Debug, Eq, PartialEq)]
+pub struct Checksum {
+   checksum : u32,
+}
+
 ////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - PatchError //
 ////////////////////////////////////////
@@ -75,6 +86,8 @@ impl std::fmt::Display for PatchError {
             => write!(stream, "Residual bytes: {left} on left, {right} on right"),
          Self::CompilationError  {sys_error,       }
             => write!(stream, "Compilation error: {sys_error}"),
+         Self::ChecksumMismatch  {found, expected, }
+            => write!(stream, "Checksum mismatch: Found {found}, expected {expected}"),
       };
    }
 }
@@ -234,6 +247,51 @@ impl Default for Alignment {
    }
 }
 
+////////////////////////
+// METHODS - Checksum //
+////////////////////////
+
+impl Checksum {
+   /// Creates a new Checksum from
+   /// the provided byte data.
+   pub fn new(
+      data  : & [u8],
+   ) -> Self {
+      // TODO: Better checksum algorithm
+      let checksum = data.iter().map(|b| *b as u32).sum();
+
+      return Self{
+         checksum : checksum,
+      };
+   }
+
+   /// Creates a Checksum from an
+   /// existing checksum value.
+   pub fn from(
+      checksum : u32,
+   ) -> Self {
+      return Self{
+         checksum : checksum,
+      };
+   }
+}
+
+//////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - Checksum //
+//////////////////////////////////////
+
+impl std::fmt::Display for Checksum {
+   fn fmt(
+      & self,
+      stream : & mut std::fmt::Formatter<'_>,
+   ) -> std::fmt::Result {
+      return write!(stream,
+         "{}",
+         self.checksum,
+      );
+   }
+}
+
 //////////////////////////////
 // INTERNAL HELPERS - Patch //
 //////////////////////////////
@@ -346,6 +404,14 @@ unsafe fn patch_buffer_hook(
 /// Implements various memory patching
 /// functions for a given type.
 ///
+/// Currently, there are the following
+/// patch types, each with respective
+/// write/create and checked/unchecked
+/// versions:
+/// <ul>
+/// <li>Test</li>
+/// </ul>
+///
 /// <h2 id=  patch_safety>
 /// <a href=#patch_safety>
 /// Safety
@@ -362,28 +428,38 @@ unsafe fn patch_buffer_hook(
 /// memory safety concerns from transmute,
 /// any of the following will lead
 /// to undefined behavior (usually a
-/// memory access violation crash)
+/// memory access violation crash):
 ///
+/// <ul>
+/// <li>
 /// The overwritten memory location
 /// is currently being accessed (race
 /// condition).
+/// </li>
 ///
+/// <li>
 /// The overwritten memory location
 /// is not a valid place to overwrite
 /// with new data.
+/// </li>
 ///
+/// <li>
 /// The data used to overwrite the
 /// memory location is not valid for
 /// its purpose (ex: overwriting code
 /// with non-code).
+/// </li>
 ///
+/// <li>
 /// Any reference to code or data
 /// in the patch data goes out of
 /// scope, either by being dropped
 /// by the compiler or by unloading
 /// the module containing the code
 /// or data.
-pub unsafe trait Patch {
+/// </li>
+/// </ul>
+pub trait Patch {
    /// The container used to store the
    /// patch metadata.  It is recommended
    /// to make this container store the
@@ -392,147 +468,65 @@ pub unsafe trait Patch {
    /// restore the overwritten bytes.
    type Container;
 
-   /// Creates a patch at a given
-   /// memory location offset using
-   /// a predicate to write the bytes
-   /// to the memory location.  The
-   /// actual memory address written
-   /// to depends on the implementation
-   /// of the trait.
-   unsafe fn patch<R, P>(
-      & mut self,
-      memory_offset_range  : R,
-      predicate            : P,
+   /// Reads the bytes stored in the
+   /// memory range as a single value.
+   unsafe fn patch_read_item<R, T>(
+      memory_range   : R,
+   ) -> Result<T>
+   where R: RangeBounds<usize>,
+         T: Clone;
+
+   /// Reads the bytes stored in the
+   /// memory range as a slice of values.
+   unsafe fn patch_read_slice<R, T>(
+      memory_range   : R,
+   ) -> Result<Vec<T>>
+   where R: RangeBounds<usize>,
+         T: Clone;
+
+   /// Writes values to a memory range
+   /// using a predicate, checking
+   /// against a checksum.
+   unsafe fn patch_write_with<R, P>(
+      memory_range   : R,
+      checksum       : Checksum,
+      predicate      : P,
+   ) -> Result<()>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> Result<()>;
+
+   /// Writes values to a memory range
+   /// using a predicate without checking
+   /// against a checksum.
+   unsafe fn patch_write_unchecked_with<R, P>(
+      memory_range   : R,
+      predicate      : P,
+   ) -> Result<()>
+   where R: RangeBounds<usize>,
+         P: FnOnce(& mut [u8]) -> Result<()>;
+
+   /// Writes values to a memory range
+   /// using a predicate, checking
+   /// against a checksum and storing
+   /// the old bytes in Self::Container.
+   unsafe fn patch_create_with<R, P>(
+      memory_range   : R,
+      checksum       : Checksum,
+      predicate      : P,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> Result<()>;
 
-   /// Writes a single item to a
-   /// given memory offset range.
-   /// If the length of the item
-   /// in bytes doesn't match the
-   /// memory offset range, an
-   /// error will be returned.
-   unsafe fn patch_item<R, T>(
-      & mut self,
-      memory_offset_range  : R,
-      item                 : T,
+   /// Writes values to a memory range
+   /// using a predicate, storing the
+   /// old bytes in Self::Container
+   /// without checking against a
+   /// checksum.
+   unsafe fn patch_create_unchecked_with<R, P>(
+      memory_range   : R,
+      predicate      : P,
    ) -> Result<Self::Container>
    where R: RangeBounds<usize>,
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_item(bytes, item)?;
-         return Ok(());
-      });
-   }
-
-   /// Fills a region of memory
-   /// with a single repeated value.
-   /// If there are unfillable bytes
-   /// which are unable to fully contain
-   /// a copy of the item, an error
-   /// is returned.
-   unsafe fn patch_item_fill<R, T>(
-      & mut self,
-      memory_offset_range  : R,
-      item                 : T,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_item_fill(bytes, item)?;
-         return Ok(());
-      });
-   }
-
-   /// Writes a slice of items to
-   /// a given memory offset range.
-   /// If the item slice is not the
-   /// same size in bytes as the
-   /// memory offset range, an
-   /// error is returned.
-   unsafe fn patch_slice<R, T>(
-      & mut self,
-      memory_offset_range  : R,
-      items                : & [T],
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_slice(bytes, items)?;
-         return Ok(());
-      });
-   }
-
-   /// Writes a slice of items to
-   /// a given memory offset range.
-   /// If the item slice is longer
-   /// than the memory offset range
-   /// in bytes, an error is returned.
-   /// If the item slice is shorter
-   /// than the memory offset range
-   /// in bytes, a padding alignment
-   /// and value is used to fill out
-   /// the leftover bytes.  If there
-   /// are still leftover bytes which
-   /// are too small to fit the padding
-   /// value, an error is returned.
-   unsafe fn patch_slice_padded<R, T, U>(
-      & mut self,
-      memory_offset_range  : R,
-      items                : & [T],
-      alignment            : Alignment,
-      padding              : U,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_slice_padded(bytes, items, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   /// Compiles a block of architecture
-   /// no-operation instructions to fill
-   /// the memory region.  The function
-   /// will return an error if no possible
-   /// instruction encodings can fill the
-   /// entire memory region.
-   unsafe fn patch_nop<R>(
-      & mut self,
-      memory_offset_range  : R,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_nop(bytes)?;
-         return Ok(());
-      });
-   }
-
-   /// Compiles a jump to a given
-   /// code location, padding the
-   /// rest of the memory region with
-   /// architecture-dependent no-operation
-   /// instructions.  The function will
-   /// return an error if no possible
-   /// instruction encoding can fit
-   /// within the memory region.
-   unsafe fn patch_hook<R>(
-      & mut self,
-      memory_offset_range  : R,
-      target_code_location : * const c_void,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch(self, memory_offset_range, |bytes| {
-         patch_buffer_hook(bytes, target_code_location)?;
-         return Ok(());
-      });
-   }
+         P: FnOnce(& mut [u8]) -> Result<()>;
 }
 
