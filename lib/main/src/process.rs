@@ -176,7 +176,7 @@ impl ModuleSnapshot {
    fn offset_range_to_address_range<R>(
       & self,
       offset_range   : R,
-   ) -> std::ops::Range<usize>
+   ) -> crate::patch::Result<std::ops::Range<usize>>
    where R: RangeBounds<usize>,
    {
       let base_address  = self.address_range().start;
@@ -200,7 +200,24 @@ impl ModuleSnapshot {
             => end_address,
       };
 
-      return lower_bound..upper_bound;
+      if lower_bound < base_address {
+         // Should theoretically never trigger because
+         // the compiler ensures non-negative offsets
+         // because of the unsigned type, but do this
+         // just to be safe!
+         return Err(crate::patch::PatchError::OutOfRange{
+            maximum  : base_address,
+            provided : lower_bound,
+         });
+      }
+      if upper_bound > end_address {
+         return Err(crate::patch::PatchError::OutOfRange{
+            maximum  : end_address,
+            provided : upper_bound,
+         });
+      }
+
+      return Ok(lower_bound..upper_bound);
    }
 }
 
@@ -218,7 +235,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          T: Copy,
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let item_byte_len = std::mem::size_of::<T>();
 
@@ -249,7 +266,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          T: Copy,
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let item_byte_len = std::mem::size_of::<T>();
 
@@ -292,7 +309,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range,
@@ -322,7 +339,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range,
@@ -344,7 +361,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range.clone(),
@@ -379,7 +396,7 @@ impl crate::patch::Patch for ModuleSnapshot {
    where R: RangeBounds<usize>,
          P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
    {
-      let address_range = self.offset_range_to_address_range(memory_range);
+      let address_range = self.offset_range_to_address_range(memory_range)?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range.clone(),
