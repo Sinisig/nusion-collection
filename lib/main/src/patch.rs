@@ -373,10 +373,9 @@ impl Checksum {
    pub fn new(
       data  : & [u8],
    ) -> Self {
-      // TODO: Better checksum algorithm
-      let checksum = data.iter().fold(0, |sum : u32, b : & u8| {
-         sum.overflowing_add(*b as u32).0
-      });
+      let checksum = crc::Crc::<u32>::new(
+         &crc::CRC_32_CKSUM,
+      ).checksum(data);
 
       return Self{
          checksum : checksum,

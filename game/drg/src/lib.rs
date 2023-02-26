@@ -51,7 +51,7 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    use nusion::patch::Patch;
    let _ammo_hook = unsafe{game!()?.patch_create_hook(
       0x14D7FAB..0x14D7FC6,
-      nusion::patch::Checksum::from(2070),
+      nusion::patch::Checksum::from(0xF2185EA3),
       test_hook_ammo_trampoline as * const core::ffi::c_void,
    )}?;
 
