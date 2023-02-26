@@ -31,6 +31,7 @@ pub enum PatchError {
       expected    : Checksum,
    },
    ZeroLengthType,
+   OutOfRange,
 }
 
 /// A result type returned by patch
@@ -91,6 +92,8 @@ impl std::fmt::Display for PatchError {
             => write!(stream, "Checksum mismatch: Found {found}, expected {expected}"),
          Self::ZeroLengthType
             => write!(stream, "Type has zero length for non-zero range length"),
+         Self::OutOfRange
+            => write!(stream, "Out of range"),
       };
    }
 }
@@ -153,21 +156,41 @@ impl Alignment {
 
       let bytes_pad_left   = match self {
          Self::Left
-            => 0,
+            => {
+               0
+            },
          Self::LeftOffset        {elements}
-            => *elements * element_size,
+            => {
+               *elements * element_size
+            },
          Self::LeftByteOffset    {bytes   }
-            => *bytes,
+            => {
+               *bytes
+            },
          Self::Right
-            => byte_pad_count,
+            => {
+               byte_pad_count
+            },
          Self::RightOffset       {elements}
-            => byte_pad_count - *elements * element_size,
+            => {
+               byte_pad_count.checked_sub(*elements * element_size).ok_or(
+                  PatchError::OutOfRange
+               )?
+            },
          Self::RightByteOffset   {bytes   }
-            => byte_pad_count - *bytes,
+            => {
+               byte_pad_count.checked_sub(*bytes).ok_or(
+                  PatchError::OutOfRange
+               )?
+            },
          Self::Center
-            => element_size * ((byte_pad_count / 2) / element_size),
+            => {
+               element_size * ((byte_pad_count / 2) / element_size)
+            },
          Self::CenterByte
-            => byte_pad_count / 2,
+            => {
+               byte_pad_count / 2
+            },
       };
       let bytes_pad_right  = byte_pad_count - bytes_pad_left;
 
