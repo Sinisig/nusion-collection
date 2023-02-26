@@ -271,8 +271,7 @@ impl crate::patch::Patch for ModuleSnapshot {
 
       if bytes.len() % item_byte_len != 0 {
          return Err(crate::patch::PatchError::ResidualBytes{
-            left  : 0,
-            right : bytes.len() % item_byte_len,
+            residual : bytes.len() % item_byte_len,
          });
       }
 

@@ -20,6 +20,9 @@ pub enum PatchError {
       expected    : usize,
    },
    ResidualBytes{
+      residual    : usize,
+   },
+   ResidualBytesDouble{
       left        : usize,
       right       : usize,
    },
@@ -30,8 +33,11 @@ pub enum PatchError {
       found       : Checksum,
       expected    : Checksum,
    },
+   OutOfRange{
+      maximum     : usize,
+      provided    : usize,
+   },
    ZeroLengthType,
-   OutOfRange,
 }
 
 /// A result type returned by patch
@@ -80,20 +86,23 @@ impl std::fmt::Display for PatchError {
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
       return match self {
-         Self::MemoryError       {sys_error,       }
+         Self::MemoryError          {sys_error,       }
             => write!(stream, "Memory error: {sys_error}",                          ),
-         Self::LengthMismatch    {found, expected, }
+         Self::LengthMismatch       {found, expected, }
             => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
-         Self::ResidualBytes     {left, right,     }
+         Self::ResidualBytes        {residual,        }
+            => write!(stream, "{residual} leftover residual bytes"),
+         Self::ResidualBytesDouble  {left, right,     }
             => write!(stream, "Residual bytes: {left} on left, {right} on right"),
-         Self::CompilationError  {sys_error,       }
+         Self::CompilationError     {sys_error,       }
             => write!(stream, "Compilation error: {sys_error}"),
-         Self::ChecksumMismatch  {found, expected, }
+         Self::ChecksumMismatch     {found, expected, }
             => write!(stream, "Checksum mismatch: Found {found}, expected {expected}"),
+         Self::OutOfRange           {maximum, provided}
+            => write!(stream, "Out of range: Maximum of {maximum} bytes, provided {provided} bytes"),
          Self::ZeroLengthType
             => write!(stream, "Type has zero length for non-zero range length"),
-         Self::OutOfRange
-            => write!(stream, "Out of range"),
+
       };
    }
 }
@@ -161,11 +170,27 @@ impl Alignment {
             },
          Self::LeftOffset        {elements}
             => {
-               *elements * element_size
+               let bytes = *elements * element_size;
+               if bytes > byte_pad_count {
+                  return Err(PatchError::OutOfRange{
+                     maximum  : byte_pad_count,
+                     provided : bytes,
+                  });
+               }
+
+               bytes
             },
          Self::LeftByteOffset    {bytes   }
             => {
-               *bytes
+               let bytes = *bytes;
+               if bytes > byte_pad_count {
+                  return Err(PatchError::OutOfRange{
+                     maximum  : byte_pad_count,
+                     provided : bytes,
+                  });
+               }
+
+               bytes            
             },
          Self::Right
             => {
@@ -173,15 +198,27 @@ impl Alignment {
             },
          Self::RightOffset       {elements}
             => {
-               byte_pad_count.checked_sub(*elements * element_size).ok_or(
-                  PatchError::OutOfRange
-               )?
+               let bytes = *elements * element_size;
+               if bytes > byte_pad_count {
+                  return Err(PatchError::OutOfRange{
+                     maximum  : byte_pad_count,
+                     provided : bytes,
+                  });
+               }
+
+               byte_pad_count - bytes
             },
          Self::RightByteOffset   {bytes   }
             => {
-               byte_pad_count.checked_sub(*bytes).ok_or(
-                  PatchError::OutOfRange
-               )?
+               let bytes = *bytes;
+               if bytes > byte_pad_count {
+                  return Err(PatchError::OutOfRange{
+                     maximum  : byte_pad_count,
+                     provided : bytes,
+                  });
+               }
+
+               byte_pad_count - bytes
             },
          Self::Center
             => {
@@ -197,7 +234,7 @@ impl Alignment {
       let bytes_residual_left    = bytes_pad_left  % element_size;
       let bytes_residual_right   = bytes_pad_right % element_size;
       if bytes_residual_left != 0 || bytes_residual_right != 0 {
-         return Err(PatchError::ResidualBytes{
+         return Err(PatchError::ResidualBytesDouble{
             left  : bytes_residual_left,
             right : bytes_residual_right,
          });
@@ -407,8 +444,7 @@ where T: Clone,
 
    if residual != 0 {
       return Err(PatchError::ResidualBytes{
-         left  : 0,
-         right : residual,
+         residual : residual,
       });
    }
 
@@ -481,8 +517,7 @@ where T: Clone,
 
    if buffer.len() % slice_len_bytes != 0 {
       return Err(PatchError::ResidualBytes{
-         left  : 0,
-         right : buffer.len() % slice_len_bytes,
+         residual : buffer.len() % slice_len_bytes,
       });
    }
 
