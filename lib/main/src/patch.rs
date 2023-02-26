@@ -461,8 +461,29 @@ where T: Clone,
       });
    }
 
-   // TODO: Actual copying
-   todo!()
+   // This is how the sausage is made
+   // Have to create Vec copies so we
+   // call clone() and can still access
+   // the raw bytes.  Before you ask,
+   // std::slice::clone_from_slice()
+   // doesn't work for this use case.
+   let mut buffer_view = & mut buffer[..];
+   while buffer_view.len() != 0 {
+      // Clone slice elements and convert to byte slice
+      let slice_clone = slice.to_vec();
+      let slice_clone = std::slice::from_raw_parts(
+         slice_clone.as_ptr() as * const u8,
+         slice_len_bytes,
+      );
+
+      // Copy to the beginning of the buffer view
+      buffer_view[..slice_clone.len()].copy_from_slice(slice_clone);
+
+      // Isolate the buffer view to cut off the written bytes
+      buffer_view = & mut buffer_view[slice_clone.len()..];
+   }
+
+   return Ok(());
 }
 
 unsafe fn patch_buffer_slice_padded<T, U>(
