@@ -206,7 +206,7 @@ impl Alignment {
          pad_count_right,
       ) = self.padding_count::<U>(
          buffer.len(),
-         1,
+         size_of_t,
       )?;
  
       let byte_end_left    = pad_count_left * size_of_u;
