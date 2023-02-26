@@ -46,7 +46,49 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
 
-   std::thread::sleep(std::time::Duration::from_secs(5));
+   // Test function hook which intercepts
+   // the ammo decrement for most weapons
+   use nusion::patch::Patch;
+   let _ammo_hook = unsafe{game!()?.patch_create_hook(
+      0x14D7FAB..0x14D7FC6,
+      nusion::patch::Checksum::from(2070),
+      test_hook_ammo_trampoline as * const core::ffi::c_void,
+   )}?;
+
+   std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
+}
+
+std::arch::global_asm!("
+test_hook_ammo_trampoline:
+   // Stolen bytes
+   sub      eax,[rcx+0x630]
+   xor      ebp,ebp
+   test     eax,eax
+   mov      [rsp+0xC0],r12 // Add +0x08 to account for call
+   cmovle   eax,ebp
+   mov      [rcx+0x648],eax
+
+   // Preserve volatiles and align stack
+   push     rcx
+
+   // Call HLL hook
+   lea      rcx,[rcx+0x648]
+   call     test_hook_ammo
+
+   // Restore volatiles and stack
+   pop      rcx
+
+   // Return, woot woot
+   ret
+");
+extern "C" {fn test_hook_ammo_trampoline();}
+
+#[no_mangle]
+extern "C" fn test_hook_ammo(ammo : & mut i32) {
+   *ammo += 2; // Account for decrement and add one to increment
+   
+   println!("Received ammo hook! New value: {ammo}");
+   return;
 }
 
