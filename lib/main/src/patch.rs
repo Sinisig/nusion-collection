@@ -280,7 +280,7 @@ impl Alignment {
          pad_count_left,
       )}.fill(value.clone());
 
-      // Copy slice
+      // Copy item
       let dest = buffer[
          byte_end_left..byte_end_slice
       ].as_ptr() as * mut T;
@@ -332,7 +332,7 @@ impl Alignment {
          ].as_ptr() as * mut U,
          pad_count_left,
       )}.fill(value.clone());
-
+ 
       // Copy slice
       unsafe{std::slice::from_raw_parts_mut(
          buffer[
