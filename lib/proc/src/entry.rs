@@ -1,14 +1,5 @@
-//! Crate root for nusion-proc-macros, a collection
-//! of procedural macros to be incorporated into
-//! nusion.
-//!
-//! It is not recommended to use this crate directly,
-//! but instead include nusion as a dependency, as
-//! nusion re-exports all macros in this crate.
-
-////////////////////////////////////////////
-// ATTRIBUTE MACRO IMPLEMENTATION - entry //
-////////////////////////////////////////////
+//! Implementation of entry attribute
+//! macro.
 
 struct EntrypointInfo {
    identifier  : syn::Ident,
@@ -197,32 +188,7 @@ pub fn entry(
    return output;
 }
 
-///////////////////////////////////////
-// ATTRIBUTE MACRO DEFINITION - hook //
-///////////////////////////////////////
-
-/// Creates and associates a low-level
-/// assembly hook to a function for use
-/// with hook patch functions.  A constant
-/// containing the function pointer to
-/// the assembly hook will be created
-/// named using the identifier passed
-/// as part of the attributes for the
-/// macro.
-///
-/// The first argument to the attributes
-/// will be a string literal containing
-/// the assembly for calling the high-level
-/// code.  The second argument will be
-/// the identifier for the function
-/// pointer to the assembly hook.
-#[proc_macro_attribute]
-#[proc_macro_error::proc_macro_error]
-pub fn hook(
-   attr  : proc_macro::TokenStream,
-   item  : proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-   // TODO: Implement lol
-   item
-}
+// Unit tests
+#[cfg(tests)]
+mod tests;
 

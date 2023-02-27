@@ -52,15 +52,15 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    let _ammo_hook = unsafe{game!()?.patch_create_hook(
       0x14D7FAB..0x14D7FC6,
       nusion::patch::Checksum::from(0xF2185EA3),
-      test_hook_ammo_trampoline as * const core::ffi::c_void,
+      TEST_HOOK_AMMO_TRAMPOLINE,
    )}?;
 
    std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
 }
 
-std::arch::global_asm!("
-test_hook_ammo_trampoline:
+#[nusion::hook(
+   "
    // Stolen bytes
    sub      eax,[rcx+0x630]
    xor      ebp,ebp
@@ -81,11 +81,10 @@ test_hook_ammo_trampoline:
 
    // Return, woot woot
    ret
-");
-extern "C" {fn test_hook_ammo_trampoline();}
-
-#[no_mangle]
-extern "C" fn test_hook_ammo(ammo : & mut i32) {
+   ",
+   TEST_HOOK_AMMO_TRAMPOLINE,
+)]
+fn test_hook_ammo(ammo : & mut i32) {
    *ammo += 2; // Account for decrement and add one to increment
    
    println!("Received ammo hook! New value: {ammo}");
