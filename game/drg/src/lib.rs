@@ -74,7 +74,7 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
 
    // Call HLL hook
    lea      rcx,[rcx+0x648]
-   call     test_hook_ammo
+   call     {hook}
 
    // Restore volatiles and stack
    pop      rcx

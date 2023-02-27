@@ -213,9 +213,36 @@ pub fn entry(
 /// The first argument to the attributes
 /// will be a string literal containing
 /// the assembly for calling the high-level
-/// code.  The second argument will be
+/// code.  This string literal mostly follows
+/// the same syntax as the core::arch::global_asm!
+/// macro, but the first positional parameter
+/// will be the identifier for the high-level
+/// function.  Use this first parameter to
+/// call the high-level trampoline.  Unlike
+/// global_asm!, there are no options for
+/// the assembly block.  Those are created
+/// inside the macro as constraints for the
+/// provided assembly block.
+///
+/// The second argument will be
 /// the identifier for the function
 /// pointer to the assembly hook.
+/// This constant will have the type
+/// core::arch::c_void, and will point
+/// to the <b>assembly hook</b>, not
+/// the high-level trampoline.
+///
+/// <h2 id=  safety>
+/// <a href=#safety>
+/// Safety
+/// </a></h2>
+/// It is assumed the provided assembly
+/// hook has no undefined behavior, calls
+/// the high-level hook with valid parameters,
+/// and aligns and restores the stack.
+/// Not obeying these rules will lead
+/// to catastrophic results that will be
+/// near impossible to debug.
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
 pub fn hook(
