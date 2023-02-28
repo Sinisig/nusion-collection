@@ -129,6 +129,26 @@ pub fn nop9(
    );
 }
 
+pub fn nop10(
+   buffer   : & mut [u8],
+) -> Result<usize> {
+   return assemble(
+      buffer,
+      &[0x66, 0x66, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00],
+      &[],
+   );
+}
+
+pub fn nop11(
+   buffer   : & mut [u8],
+) -> Result<usize> {
+   return assemble(
+      buffer,
+      &[0x66, 0x66, 0x66, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00],
+      &[],
+   );
+}
+
 pub fn ud2(
    buffer   : & mut [u8],
 ) -> Result<usize> {
