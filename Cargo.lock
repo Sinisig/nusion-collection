@@ -90,9 +90,11 @@ dependencies = [
 name = "nusion-proc-macros"
 version = "0.2.0+alpha"
 dependencies = [
+ "crc",
  "lazy_static",
  "proc-macro-crate",
  "proc-macro-error",
+ "proc-macro2",
  "quote",
  "regex",
  "syn",
