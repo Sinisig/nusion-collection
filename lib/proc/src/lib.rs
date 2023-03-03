@@ -214,30 +214,104 @@ impl syn::parse::Parse for HookAttributes {
    }
 }
 
+#[derive(Clone, Debug)]
+enum HookTemplateArgument {
+   TargetHookLabel,
+}
+
+impl std::str::FromStr for HookTemplateArgument {
+   type Err = ();
+
+   fn from_str<'l>(
+      s : &'l str,
+   ) -> Result<Self, Self::Err> {
+      use std::collections::hash_map::HashMap;
+
+      lazy_static::lazy_static! {
+         static ref ARGUMENT_MAP : HashMap<&'static str, HookTemplateArgument> = [
+            // Add new arguments here!
+            ("hook", HookTemplateArgument::TargetHookLabel)
+         ].iter().cloned().collect();
+      }
+
+      return ARGUMENT_MAP.get(s).ok_or(()).map(|a| a.clone());
+   }
+}
+
+#[derive(Debug)]
+struct HookTemplateReplacer<'s> {
+   label_target   : &'s str,
+}
+
+impl<'s> regex::Replacer for HookTemplateReplacer<'s> {
+   fn replace_append(
+      & mut self,
+      caps  : & regex::Captures<'_>,
+      dst   : & mut String,
+   ) {
+      for cap in caps.iter() {
+         // Get the capture as a string
+         let cap = match cap {
+            Some(cap)   => cap.as_str(),
+            None        => break,
+         };
+         
+         // Strip out the surrounding curly brackets
+         let cap = &cap[1..cap.len()-1];
+
+         // Try to parse as an argument
+         let arg = match cap.parse::<HookTemplateArgument>() {
+            Ok(a)    => a,
+            Err(_)   => panic!("invalid template argument \"{cap}\""),
+         };
+
+         // Write the new substituted text
+         dst.push_str(match arg {
+            HookTemplateArgument::TargetHookLabel
+               => self.label_target,
+         });
+      }
+
+      return;
+   }
+}
+
 /// Internal helper, formats an input
 /// ASM template to one ready to be
 /// passed to global_asm!()
 fn hook_format_asm_template(
-   template          : & str,
-   label_assembly    : & str,
-   label_high_level  : & str,
+   template       : & str,
+   label_assembly : & str,
+   label_target   : & str,
 ) -> String {
-   // Substitute all template arguments
-   // for their real values
-   // TODO: More intelligent way of doing this
-   let mut template = template.replace(
-      "{hook}",
-      label_high_level,
+   // Regex for finding and replacing
+   // template arguments
+   lazy_static::lazy_static! {
+      static ref TEMPLATE_SEARCHER : regex::Regex = regex::Regex::new(r"(?x)
+         \{[A-Za-z0-9]*?\}
+      ").unwrap();
+   }
+
+   // Search for and iterate over every
+   // template argument
+   let template = TEMPLATE_SEARCHER.replace_all(
+      template,
+      HookTemplateReplacer{
+         label_target   : label_target,
+      },
    );
 
-   // Prepend the label declaring
-   // the assembly subroutine
-   template = format!("
-      {label_assembly}:
-      {template}
-   ");
+   // Convert to an owned string
+   let template = template.into_owned();
 
-   // Return the final result
+   // Append the prefix stuff for
+   // the function definition
+   let template = format!("
+      {}:
+      {}
+   ", label_assembly, template);
+
+   // Return the formatted ASM template
    return template;
 }
 
