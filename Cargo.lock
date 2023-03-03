@@ -83,6 +83,7 @@ version = "0.2.0+alpha"
 dependencies = [
  "proc-macro-crate",
  "proc-macro-error",
+ "quote",
  "syn",
 ]
 

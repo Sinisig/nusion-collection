@@ -158,15 +158,7 @@ pub fn entry(
    let user_func = item.clone();
 
    // Parse item into function signature
-   let signature = match syn::parse_macro_input!(item as syn::Item) {
-      syn::Item::Fn(func) => func.sig,
-      _  => {
-         proc_macro_error::emit_call_site_error!(
-            "Entrypoint item is not a function",
-         );
-         return user_func;
-      },
-   };
+   let signature = syn::parse_macro_input!(item as syn::ItemFn).sig;
 
    // Parse function signature
    let signature = match entry_parse_signature(signature) {
@@ -201,36 +193,57 @@ pub fn entry(
 // ATTRIBUTE MACRO DEFINITION - hook //
 ///////////////////////////////////////
 
-/// Creates and associates a low-level
-/// assembly hook to a function for use
-/// with hook patch functions.  A constant
-/// containing the function pointer to
-/// the assembly hook will be created
-/// named using the identifier passed
-/// as part of the attributes for the
+
+
+/// Constructs an associated assembly
+/// intermediate subroutine to call
+/// the attached function from a hook
+/// patch.
+///
+/// The first attribute contains the
+/// identifier to be used for a constant
+/// containing a void pointer to the
+/// assembly subroutine.  This constant
+/// is what should be passed as the
+/// hook target to hook patch functions.
+///
+/// The second argument is an assembly
+/// template used to create the assembly
+/// intermediary which is called by the
+/// hook patch.  This assembly template
+/// largely follows the same usage as the
+/// <code><a href=
+/// https://doc.rust-lang.org/stable/core/arch/macro.global_asm.html
+/// >global_asm!()</a></code> macro, but
+/// with a custom template argument format
+/// which intentionally doesn't allow
+/// custom options nor operand inputs.
+///
+/// <h2 id=  template_argument_format>
+/// <a href=#template_argument_format>
+/// Template Argument Format
+/// </a></h2>
+/// A template argument is represented
+/// by some argument surrounded by
+/// curly brackets.  This is simmilar
+/// to the way template arguments are
+/// used in the <code>format!()</code>
 /// macro.
 ///
-/// The first argument to the attributes
-/// will be a string literal containing
-/// the assembly for calling the high-level
-/// code.  This string literal mostly follows
-/// the same syntax as the core::arch::global_asm!
-/// macro, but the first positional parameter
-/// will be the identifier for the high-level
-/// function.  Use this first parameter to
-/// call the high-level trampoline.  Unlike
-/// global_asm!, there are no options for
-/// the assembly block.  Those are created
-/// inside the macro as constraints for the
-/// provided assembly block.
-///
-/// The second argument will be
-/// the identifier for the function
-/// pointer to the assembly hook.
-/// This constant will have the type
-/// core::arch::c_void, and will point
-/// to the <b>assembly hook</b>, not
-/// the high-level trampoline.
+/// <h2 id=  template_argument_types>
+/// <a href=#template_argument_types>
+/// Template Argument Types
+/// </a></h2>
+/// <ul>
+/// <li>
+/// <code>hook</code>: Substitutes the
+/// assembly-compatiable identifier for
+/// the target high-level rust hook
+/// function.  Use this to call the
+/// high-level rust hook function from
+/// your assembly intermediary.
+/// </li>
+/// </ul>
 ///
 /// <h2 id=  safety>
 /// <a href=#safety>
@@ -249,7 +262,6 @@ pub fn hook(
    attr  : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-   // TODO: Implement lol
-   item
+   todo!()
 }
 
