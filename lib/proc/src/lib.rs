@@ -193,7 +193,26 @@ pub fn entry(
 // ATTRIBUTE MACRO DEFINITION - hook //
 ///////////////////////////////////////
 
+struct HookAttributes {
+   asm_template   : syn::LitStr,
+   fn_ptr_ident   : syn::Ident,
+}
 
+impl syn::parse::Parse for HookAttributes {
+   fn parse(
+      input : syn::parse::ParseStream<'_>,
+   ) -> syn::parse::Result<Self> {
+      let asm_template  = input.parse()?;       // ASM Template
+      input.parse::<syn::Token![,]>()?;         // Required comma separator
+      let fn_ptr_ident  = input.parse()?;       // ASM Fn Ptr Identifier
+      input.parse::<Option<syn::Token![,]>>()?; // Optional trailing comma
+
+      return Ok(Self{
+         asm_template   : asm_template,
+         fn_ptr_ident   : fn_ptr_ident,
+      });
+   }
+}
 
 /// Constructs an associated assembly
 /// intermediate subroutine to call
@@ -262,6 +281,9 @@ pub fn hook(
    attr  : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
+   // Parse attributes as arguments
+   let args = syn::parse_macro_input!(attr as HookAttributes);
+
    todo!()
 }
 
