@@ -222,12 +222,13 @@ fn hook_format_asm_template(
    label_assembly    : & str,
    label_high_level  : & str,
 ) -> String {
-   // Create buffer for template creation
-   let mut template = String::from(template);
-
    // Substitute all template arguments
    // for their real values
-   // TODO: Implement
+   // TODO: More intelligent way of doing this
+   let mut template = template.replace(
+      "{hook}",
+      label_high_level,
+   );
 
    // Prepend the label declaring
    // the assembly subroutine
@@ -341,7 +342,7 @@ pub fn hook(
 
    // Put everything together and generate
    // the hook syntax
-   let prepend_items = proc_macro::TokenStream::from(quote::quote!{
+   let asm = proc_macro::TokenStream::from(quote::quote!{
       // Assemble the intermediary hook
       core::arch::global_asm!(#asm_template);
 
@@ -360,7 +361,7 @@ pub fn hook(
    // generated syntax and return the new
    // syntax
    let mut output = proc_macro::TokenStream::new();
-   output.extend(prepend_items);
+   output.extend(asm);
    output.extend(item);
    return output;
 }
