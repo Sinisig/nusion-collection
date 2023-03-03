@@ -150,7 +150,7 @@ fn entry_parse_signature(
 /// library crate.
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
-pub fn entry(
+pub fn main(
    _     : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
