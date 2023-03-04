@@ -388,7 +388,7 @@ impl HookArguments {
 
       // Construct subroutine label
       output.push_str(&format!(
-         "section .text\n{identifier_asm}:\n",
+         ".section .text\n{identifier_asm}:\n",
       ));
 
       // Substitute template arguments
