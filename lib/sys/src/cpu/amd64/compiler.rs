@@ -1,7 +1,5 @@
 //! crate::cpu::compiler implementation for AMD64.
 
-use crate::compiler::CompilationError;
-
 pub fn nop_fill(
    memory_region : & mut [u8],
 ) -> crate::compiler::Result<& mut [u8]> {
@@ -33,51 +31,48 @@ pub unsafe fn hook_fill(
    memory_region  : & mut [u8],
    target_hook    : * const core::ffi::c_void,
 ) -> crate::compiler::Result<& mut [u8]> {
+   const NOP_BYTES_TO_COMPILE_JMP : usize
+      = 22; // At most 2 consecutive 11-byte nops
+
    let mut memory_view = & mut memory_region[..];
 
-   // Calculate relative offset for call
-   let target_hook_relative = target_hook.cast::<u8>().offset_from(
-      memory_view.as_ptr(),
-   );
+   // Required instruction - Call to the hook
+   let bytes = super::assembler::call(
+      memory_view,
+      target_hook,
+   )?;
+   memory_view = & mut memory_view[bytes..];
 
-   // Required instruction - Assemble smallest call possible
-   let call_length =
-   if let Ok(rel32) = i32::try_from(target_hook_relative) {
-      super::assembler::call_rel32(memory_view, rel32)
-   } else {
-      super::assembler::call_abs64(memory_view, target_hook as u64)
-   }.map_err(|_| CompilationError::ImpossibleEncoding)?;
-   memory_view = & mut memory_view[call_length..]; 
-
-   // Performance optimization - Don't compile a jmp if we have
-   // a small amount of nop instructions
-   const NOP_MAX_BYTES_WITHOUT_JMP : usize = 18;
-
-   if memory_view.len() > NOP_MAX_BYTES_WITHOUT_JMP {
-      // Get relative offset for jump past nop bytes
-      let target_skip_relative = memory_view.len();
-
-      // Optional instruction - Assemble smallet jump to end of block
-      let jmp_length =
-      if let Ok(rel8) = i8::try_from(target_skip_relative) {
-         super::assembler::jmp_rel8(memory_view, rel8)
-      } else if let Ok(rel32) = i32::try_from(target_skip_relative) {
-         super::assembler::jmp_rel32(memory_view, rel32)
-      } else {
-         super::assembler::jmp_abs64(memory_view, memory_view.as_ptr_range().end as u64)
-      }.unwrap_or(0);
-      memory_view = & mut memory_view[jmp_length..];
-
-      // Optional instruction - Assemble ud2 instruction right after jmp
-      let ud2_length =
-      super::assembler::ud2(memory_view).unwrap_or(0);
-      memory_view = & mut memory_view[ud2_length..];
+   // If the remaining bytes are small, don't
+   // compile a jmp and ud2, this is a speed
+   // optimization.  It also ensures the next
+   // code should never return Err.
+   if memory_view.len() <= NOP_BYTES_TO_COMPILE_JMP {
+      nop_fill(memory_view)?;
+      return Ok(memory_region);
    }
+   
+   // Compile a jump to the end of the
+   // memory region
+   let bytes = super::assembler::jmp(
+      memory_view,
+      memory_view.as_ptr_range().end.cast(),
+   )?;
+   memory_view = & mut memory_view[bytes..];
 
-   // Fill the rest of the memory view with nop instructions
+   // Compile a ud2 instruction after the
+   // jmp in case something goes catastrophically
+   // wrong and we fail to execute the jmp.
+   let bytes = super::assembler::ud2(
+      memory_view,
+   )?;
+   memory_view = & mut memory_view[bytes..];
+
+   // Fill the rest of the memory
+   // with nop instructions
    nop_fill(memory_view)?;
 
-   // Return original memory region successfully
+   // Successfully return
    return Ok(memory_region);
 }
 

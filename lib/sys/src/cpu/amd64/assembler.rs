@@ -192,6 +192,25 @@ pub fn jmp_abs64(
    );
 }
 
+pub fn jmp(
+   buffer   : & mut [u8],
+   target   : * const core::ffi::c_void,
+) -> Result<usize> {
+   let target  = target as * const u8;
+   let current = buffer.as_ptr();
+
+   let offset = unsafe{target.offset_from(current)};
+
+   if let Ok(offset) = i8  ::try_from(offset) {
+      return jmp_rel8   (buffer, offset);
+   }
+   if let Ok(offset) = i32 ::try_from(offset) {
+      return jmp_rel32  (buffer, offset);
+   }
+
+   return jmp_abs64(buffer, target as u64);
+}
+
 pub fn call_rel32(
    buffer   : & mut [u8],
    rel32    : i32,
@@ -212,5 +231,21 @@ pub fn call_abs64(
       &[0xFF, 0x15, 0x02, 0x00, 0x00, 0x00, 0xEB, 0x08],
       &abs64.to_le_bytes(),
    );
+}
+
+pub fn call(
+   buffer   : & mut [u8],
+   target   : * const core::ffi::c_void,
+) -> Result<usize> {
+   let target  = target as * const u8;
+   let current = buffer.as_ptr();
+
+   let offset = unsafe{target.offset_from(current)};
+
+   if let Ok(offset) = i32 ::try_from(offset) {
+      return call_rel32 (buffer, offset);
+   }
+
+   return call_abs64(buffer, target as u64);
 }
 
