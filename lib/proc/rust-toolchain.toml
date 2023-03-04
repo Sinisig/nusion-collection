@@ -1,0 +1,7 @@
+# We need nightly rust so we can emit
+# warnings and also join Span objects
+# together
+
+[toolchain]
+channel = "nightly"
+

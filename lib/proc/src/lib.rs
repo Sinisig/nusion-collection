@@ -11,134 +11,517 @@
 ///////////////////////////////////////////
 
 struct EntrypointInfo {
-   identifier  : syn::Ident,
-   return_type : EntrypointReturnType,
+   func     : syn::ItemFn,
+   variant  : EntrypointReturnType,
 }
 
 enum EntrypointReturnType {
-   Void,    // -> ()
+   Void,    // (no return type)
    Static,  // -> Result<(), E: std::error::Error>
    Dynamic, // -> Result<(), Box<dyn std::error::Error>>
 }
 
-// Internal helper for parsing a function
-// signature into its return type.  The
-// return type is an error string to be
-// parsed into a compile error.
-fn entry_parse_signature(
-   signature   : syn::Signature,
-) -> Result<EntrypointInfo, String> {
-   // Verify argument list is empty
-   if signature.inputs.is_empty() == false {
-      return Err(format!(
-         "Entrypoint has non-zero argument count",
-      ));
-   }
+impl syn::parse::Parse for EntrypointInfo {
+   fn parse(
+      input : syn::parse::ParseStream<'_>,
+   ) -> syn::parse::Result<Self> {
+      const OUTPUT_ERROR_MSG : &'static str
+         = "main return type should be nothing, Result<(), E: Error>, or Result<(), Box<dyn std::error::Error>>";
 
-   // Store function identifier and return type
-   let identifier    = signature.ident;
-   let return_type   = signature.output;
+      // First parse the entire function
+      let func = input.parse::<syn::ItemFn>()?;
 
-   // Parse the return type if it's () or Result<(), E>
-   let return_type = match return_type {
-      syn::ReturnType::Default
-         => return Ok(EntrypointInfo{
-            identifier  : identifier,
-            return_type : EntrypointReturnType::Void,
-         }),
-      syn::ReturnType::Type(_, ty)
-         => *ty,
-   };
+      // Check that the visibility is private
+      match &func.vis {
+         syn::Visibility::Public    (tok) => {
+            let span = tok.pub_token.span.unwrap();
+            proc_macro_error::emit_error!(
+               span, "visibility should be private",
+            );
+         },
+         syn::Visibility::Crate     (tok) => {
+            let span = tok.crate_token.span.unwrap();
+            proc_macro_error::emit_error!(
+               span, "visibility should be private",
+            );
+         },
+         syn::Visibility::Restricted(tok) => {
+            let span = tok.paren_token.span.unwrap();
+            proc_macro_error::emit_error!(
+               span, "visibility should be private",
+            );
+         },
+         syn::Visibility::Inherited       => (),
+      }
 
-   // Make sure it's an item path
-   let return_type = match return_type {
-      syn::Type::Path(path) => path.path,
-      _ => return Err(format!(
-         "Entrypoint doesn't return a Result type",
-      )),
-   };
+      // Check that the identifier is named 'main'
+      if func.sig.ident != quote::format_ident!("main") {
+         let span = func.sig.ident.span();
+         proc_macro_error::emit_error!(
+            span, "identifier should be 'main'",
+         );
+      }
 
-   // Get the first and only path segment
-   let return_type = return_type.segments.first().unwrap();
+      // Make sure there are no input arguments
+      if func.sig.inputs.is_empty() == false {
+         let span = func.sig.paren_token.span;
+         proc_macro_error::emit_error!(
+            span, "main should take 0 arguments",
+         );
+      }
 
-   // Verify it's a Result or std::result::Result
-   if return_type.ident != "Result" &&
-      return_type.ident != "std::result::Result"
-   {
-      return Err(format!(
-         "Entrypoint doesn't return a Result type",
-      ));
-   }
+      // If there is no return type, construct
+      // a void return type main function.
+      // Otherwise unwrap the stored type
+      let (arrow_token, output) = match &func.sig.output {
+         syn::ReturnType::Default => {
+            return Ok(Self{
+               func     : func,
+               variant  : EntrypointReturnType::Void,
+            });
+         },
+         syn::ReturnType::Type(ar, ty) => (ar, ty),
+      };
 
-   // Get generic argument list
-   let return_type = match &return_type.arguments {
-      syn::PathArguments::AngleBracketed(args) => args.args.clone(),
-      _ => return Err(format!(
-         "Entrypoint returns invalid Result type",
-      )),
-   };
+      // Make sure the type is a type path
+      let output = match &**output {
+         syn::Type::Path(path) => &path.path,
+         
+         syn::Type::Array        (ar) => {
+            let span = ar.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::BareFn       (bf) => {
+            let span = bf.fn_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         }
+         syn::Type::Group        (gp) => {
+            let span = gp.group_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::ImplTrait    (it) => {
+            let span = it.impl_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Infer        (ud) => {
+            let span = ud.underscore_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Macro        (mc) => {
+            let span = mc.mac.bang_token.spans[0];
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Never        (nv) => {
+            let span = nv.bang_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Paren        (pn) => {
+            let span = pn.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Ptr          (pt) => {
+            let span = pt.star_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Reference    (rf) => {
+            let span = rf.and_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Slice        (sc) => {
+            let span = sc.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::TraitObject  (to) => {
+            let span = match to.dyn_token {
+               Some(dy) => dy.span,
+               None     => arrow_token.spans[1],
+            };
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Tuple        (tp) => {
+            let span = tp.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         _ => {
+            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+         },
+      };
 
-   // Make sure there are exactly two type generic paramenters
-   if return_type.len() != 2 {
-      return Err(format!(
-         "Entrypoint returns invalid Result type",
-      ));
-   }
+      // Look at the last identifier
+      // If it is a different Result
+      // type to std::result::Result,
+      // let quote deal with the mess
+      let output = output.segments.last().unwrap();
 
-   // Break up into Ok type and Err type
-   let return_ok  = match return_type.iter().nth(0).unwrap() {
-      syn::GenericArgument::Type(ty) => ty,
-      _ => return Err(format!(
-         "Entrypoint returns invalid Result type",
-      )),
-   };
-   let return_err = match return_type.iter().nth(1).unwrap() {
-      syn::GenericArgument::Type(ty) => ty,
-      _ => return Err(format!(
-         "Entrypoint returns invalid Result type",
-      )),
-   };
+      // Verify the return type is some kind of Result
+      if output.ident != quote::format_ident!("Result") {
+         proc_macro_error::abort!(output.ident.span(), "{}", OUTPUT_ERROR_MSG);
+      }
 
-   // Verify the Ok variant is the unit type
-   let return_ok = match return_ok {
-      syn::Type::Tuple(ty) => ty,
-      _ => return Err(format!(
-         "Entrypoint Result Ok variant is not the unit type '()'",
-      )),
-   };
-   if return_ok.elems.is_empty() == false {
-      return Err(format!(
-         "Entrypoint Result Ok variant is not the unit type '()'",
-      ));
-   }
+      // Unwrap the generic arguments
+      let output_args = match &output.arguments {
+         syn::PathArguments::AngleBracketed(args) => args,
 
-   // Get path item for Err variant
-   let return_err = match return_err {
-      syn::Type::Path(path)   => path,
-      _ => return Err(format!(
-         "Entrypoint Result Err variant is not an item",
-      )),
-   };
+         syn::PathArguments::Parenthesized(paren) => {
+            let span = paren.paren_token.span;
+            proc_macro_error::abort!(span, "generic arguments should be surrounded by angle brackets");
+         },
+         syn::PathArguments::None => {
+            let span = output.ident.span();
+            proc_macro_error::abort!(span, "Result missing generic arguments");
+         },
+      };
 
-   // Isolate the path segment for the item
-   let return_err = return_err.path.segments.first().unwrap();
+      // Verify there are exactly 2 generics
+      if output_args.args.len() != 2 {
+         let span = output_args.lt_token.span;
+         proc_macro_error::abort!(span, "Result should have 2 generic arguments");
+      }
 
-   // Check if the Err type is a static type or trait object
-   if return_err.ident != "Box" &&
-      return_err.ident != "std::boxed::Box"
-   {
-      return Ok(EntrypointInfo{
-         identifier  : identifier,
-         return_type : EntrypointReturnType::Static,
+      // Verify the first generic argument
+      // is a type
+      let output_arg_ok = match output_args.args.first().unwrap() {
+         syn::GenericArgument::Type(ty) => ty,
+
+         syn::GenericArgument::Lifetime   (lt) => {
+            let span = lt.apostrophe;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Const      (_)  => {
+            let span = output.ident.span();
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Binding    (bd) => {
+            let span = bd.eq_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Constraint (ct) => {
+            let span = ct.colon_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Verify the first generic argument
+      // is a tuple type
+      let output_arg_ok = match output_arg_ok {
+         syn::Type::Tuple(tp) => tp,
+         
+         syn::Type::Array        (ar) => {
+            let span = ar.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::BareFn       (bf) => {
+            let span = bf.fn_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         }
+         syn::Type::Group        (gp) => {
+            let span = gp.group_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::ImplTrait    (it) => {
+            let span = it.impl_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Infer        (ud) => {
+            let span = ud.underscore_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Macro        (mc) => {
+            let span = mc.mac.bang_token.spans[0];
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Never        (nv) => {
+            let span = nv.bang_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Paren        (pn) => {
+            let span = pn.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Path         (ph) => {
+            let span = ph.path.segments.last().unwrap().ident.span();
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Ptr          (pt) => {
+            let span = pt.star_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Reference    (rf) => {
+            let span = rf.and_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Slice        (sc) => {
+            let span = sc.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::TraitObject  (to) => {
+            let span = match to.dyn_token {
+               Some(dy) => dy.span,
+               None     => arrow_token.spans[1],
+            };
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         _ => {
+            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Verify the tuple argument
+      // is empty (unit type)
+      if output_arg_ok.elems.is_empty() == false {
+         let span = output_arg_ok.paren_token.span;
+         proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+      }
+
+      // Verify the second generic
+      // argument is a type
+      let output_arg_err = match output_args.args.last().unwrap() {
+         syn::GenericArgument::Type(ty) => ty,
+
+         syn::GenericArgument::Lifetime   (lt) => {
+            let span = lt.apostrophe;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Const      (_)  => {
+            let span = output.ident.span();
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Binding    (bd) => {
+            let span = bd.eq_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Constraint (ct) => {
+            let span = ct.colon_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Verify the type is some
+      // kind of path
+      let output_arg_err = match output_arg_err {
+         syn::Type::Path(path) => &path.path,
+         
+         syn::Type::Array        (ar) => {
+            let span = ar.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::BareFn       (bf) => {
+            let span = bf.fn_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         }
+         syn::Type::Group        (gp) => {
+            let span = gp.group_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::ImplTrait    (it) => {
+            let span = it.impl_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Infer        (ud) => {
+            let span = ud.underscore_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Macro        (mc) => {
+            let span = mc.mac.bang_token.spans[0];
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Never        (nv) => {
+            let span = nv.bang_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Paren        (pn) => {
+            let span = pn.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Ptr          (pt) => {
+            let span = pt.star_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Reference    (rf) => {
+            let span = rf.and_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Slice        (sc) => {
+            let span = sc.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::TraitObject  (to) => {
+            let span = match to.dyn_token {
+               Some(dy) => dy.span,
+               None     => arrow_token.spans[1],
+            };
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Tuple        (tp) => {
+            let span = tp.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         _ => {
+            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Get the ending path item for the
+      // err variant.
+      let output_arg_err = output_arg_err.segments.last().unwrap();
+
+      // If the identifier is not 'Box', assume
+      // this is some kind of user type implementing
+      // the Error trait.
+      if output_arg_err.ident != quote::format_ident!("Box") {
+         return Ok(Self{
+            func     : func,
+            variant  : EntrypointReturnType::Static,
+         });
+      }
+
+      // Verify the Box type has provided
+      // generic arguments
+      let output_arg_err = match &output_arg_err.arguments {
+         syn::PathArguments::AngleBracketed(args) => args,
+
+         syn::PathArguments::Parenthesized(paren) => {
+            let span = paren.paren_token.span;
+            proc_macro_error::abort!(span, "generic arguments should be surrounded by angle brackets");
+         },
+         syn::PathArguments::None => {
+            let span = output.ident.span();
+            proc_macro_error::abort!(span, "Box missing generic arguments");
+         },
+      };
+
+      // Verify there is exactly one generic argument
+      if output_arg_err.args.len() != 1 {
+         let span = output_arg_err.lt_token.span;
+         proc_macro_error::abort!(span, "Box should have 1 generic argument");
+      }
+
+      // Verify the generic argument is a type
+      let output_arg_err = match output_arg_err.args.last().unwrap() {
+         syn::GenericArgument::Type(ty) => ty,
+
+         syn::GenericArgument::Lifetime   (lt) => {
+            let span = lt.apostrophe;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Const      (_)  => {
+            let span = output.ident.span();
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Binding    (bd) => {
+            let span = bd.eq_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::GenericArgument::Constraint (ct) => {
+            let span = ct.colon_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Verify the type is a trait object
+      let output_arg_err = match output_arg_err {
+         syn::Type::TraitObject(to) => to,
+
+         syn::Type::Array        (ar) => {
+            let span = ar.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::BareFn       (bf) => {
+            let span = bf.fn_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         }
+         syn::Type::Group        (gp) => {
+            let span = gp.group_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::ImplTrait    (it) => {
+            let span = it.impl_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Infer        (ud) => {
+            let span = ud.underscore_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Macro        (mc) => {
+            let span = mc.mac.bang_token.spans[0];
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Never        (nv) => {
+            let span = nv.bang_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Paren        (pn) => {
+            let span = pn.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Path         (ph) => {
+            let span = ph.path.segments.last().unwrap().ident.span();
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Ptr          (pt) => {
+            let span = pt.star_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Reference    (rf) => {
+            let span = rf.and_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Slice        (sc) => {
+            let span = sc.bracket_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         syn::Type::Tuple        (tp) => {
+            let span = tp.paren_token.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         },
+         _ => {
+            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+         },
+      };
+
+      // Verify there is only one trait bound
+      if output_arg_err.bounds.len() != 1 {
+         if let Some(d) = output_arg_err.dyn_token {
+            let span = d.span;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         } else {
+            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+         }
+      };
+
+      // Verify the trait bound is actually
+      // a trait bound
+      let output_arg_err = match output_arg_err.bounds.first().unwrap() {
+         syn::TypeParamBound::Trait(tr) => tr,
+         
+         syn::TypeParamBound::Lifetime(lt) => {
+            let span = lt.apostrophe;
+            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+         }
+      };
+
+      // Make sure the path is not empty
+      if output_arg_err.path.segments.is_empty() == true {
+         proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
+      }
+
+      // Get the last part of the path
+      let output_arg_err = output_arg_err.path.segments.last().unwrap();
+
+      // Make sure the ending path identifier is 'Error'
+      if output_arg_err.ident != quote::format_ident!("Error") {
+         let span = output_arg_err.ident.span();
+         proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
+      }
+
+      // Let quote deal with any extra
+      // corner-case bullshit, we've
+      // done enough verification
+      return Ok(Self{
+         func     : func,
+         variant  : EntrypointReturnType::Dynamic,
       });
    }
-
-   // We now know that we have a Box<> type, let
-   // the compiler deal with any more mess
-   return Ok(EntrypointInfo{
-      identifier  : identifier,
-      return_type : EntrypointReturnType::Dynamic,
-   });
 }
 
 /// Builds a shared library entrypoint
@@ -151,42 +534,41 @@ fn entry_parse_signature(
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
 pub fn main(
-   _     : proc_macro::TokenStream,
+   attr  : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-   // Store the user function for later
-   let user_func = item.clone();
+   // attr should not contain anything
+   if attr.is_empty() == false {
+      proc_macro_error::emit_call_site_error!(
+         "macro attributes should be empty"
+      );
+      return item;
+   }
 
-   // Parse item into function signature
-   let signature = syn::parse_macro_input!(item as syn::ItemFn).sig;
+   // Parse attached item into entrypoint info
+   let info = syn::parse_macro_input!(item as EntrypointInfo);
 
-   // Parse function signature
-   let signature = match entry_parse_signature(signature) {
-      Ok(sig)  => sig,
-      Err(err) => {
-         proc_macro_error::emit_call_site_error!(err);
-         return user_func;
+   // Miscellaneous variables used to construct
+   // the code for main.
+   let func    = &info.func;
+   let ident   = &func.sig.ident;
+
+   // Construct the syntax for the call
+   // to the entrypoint
+   return proc_macro::TokenStream::from(match info.variant {
+      EntrypointReturnType::Void    => quote::quote! {
+         nusion::__build_entry!(#ident, void);
+         #func
       },
-   };
-   
-   // Extract function identifier and return type as a macro arg
-   let identifier    = signature.identifier;
-   let return_type   = match signature.return_type {
-      EntrypointReturnType::Void    => "void",
-      EntrypointReturnType::Static  => "result_static",
-      EntrypointReturnType::Dynamic => "result_dynamic",
-   };
-
-   // Format entry point constrution
-   let slib_entry : proc_macro::TokenStream = format!(r"
-      nusion::__build_entry!({identifier}, {return_type});
-   ").parse().unwrap();
-
-   // Prepend entrypoint to user entrypoint function and return
-   let mut output = proc_macro::TokenStream::new();
-   output.extend(slib_entry);
-   output.extend(user_func);
-   return output;
+      EntrypointReturnType::Static  => quote::quote! {
+         nusion::__build_entry!(#ident, result_static);
+         #func
+      },
+      EntrypointReturnType::Dynamic => quote::quote! {
+         nusion::__build_entry!(#ident, result_dynamic);
+         #func
+      },
+   });
 }
 
 ///////////////////////////////////////
