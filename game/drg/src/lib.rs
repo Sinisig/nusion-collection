@@ -50,8 +50,8 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    // the ammo decrement for most weapons
    use nusion::patch::Patch;
    let _ammo_hook = unsafe{game!()?.patch_create_hook(
-      0x14D7FAB..0x14D7FC6,
-      nusion::patch::Checksum::from(0xF2185EA3),
+      0x14D7CDB..0x14D7CF9,
+      nusion::patch::Checksum::from(0x8CC8AE3B),
       TEST_HOOK_AMMO_TRAMPOLINE,
    )}?;
 
@@ -65,21 +65,22 @@ pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
    sub      eax,[rcx+0x630]
    xor      ebp,ebp
    test     eax,eax
-   mov      [rsp+0xC0],r12 // Add +0x08 to account for call
+   mov      [rsp+0xC0],r12 // +0x08 because of call
    cmovle   eax,ebp
    mov      [rcx+0x648],eax
-
-   // Preserve volatiles and align stack
+   
+   // Store volatiles and align stack
    push     rcx
 
-   // Call HLL hook
+   // Call the hook
    lea      rcx,[rcx+0x648]
    call     {hook}
 
-   // Restore volatiles and stack
+   // Restore stack and volatiles
    pop      rcx
+   mov      rax,[rcx]
 
-   // Return, woot woot
+   // Return gracefully
    ret
    ",
    TEST_HOOK_AMMO_TRAMPOLINE,
