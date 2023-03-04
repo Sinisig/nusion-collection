@@ -28,7 +28,7 @@ impl std::error::Error for MainError {
 }
 
 #[nusion::main]
-pub fn entry() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
    nusion::env_mut!().console_mut().set_title(
       "Nusion for Deep Rock Galactic by Sinisig",
    )?;
