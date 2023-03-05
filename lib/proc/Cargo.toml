@@ -2,7 +2,7 @@
 name        = "nusion-proc-macros"
 description = "Procedural macros to be included with nusion"
 authors     = ["Sinisig"]
-version     = "0.2.3+alpha"
+version     = "0.3.0+alpha"
 edition     = "2021"
 
 [lib]
