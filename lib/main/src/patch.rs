@@ -46,7 +46,7 @@ pub type Result<T> = std::result::Result<T, PatchError>;
 /// This is useful for specifying where
 /// a byte slice should be positioned
 /// within a larger section of memory.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Alignment {
    Left,
    LeftOffset{
@@ -78,13 +78,59 @@ pub struct Checksum {
 pub mod method {
    use super::*;
 
-   #[derive(Clone, Debug)]
+   #[derive(Debug)]
+   pub struct Item<'s, T: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub item                : &'s T,
+   }
+
+   #[derive(Debug)]
+   pub struct ItemFill<'s, T: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub item                : &'s T,
+   }
+
+   #[derive(Debug)]
+   pub struct ItemPadded<'s, T: Clone, U: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
+      pub item                : &'s T,
+      pub padding             : &'s U,
+   }
+
+   #[derive(Debug)]
+   pub struct Slice<'s, T: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub slice               : &'s [T],
+   }
+
+   #[derive(Debug)]
+   pub struct SliceFill<'s, T: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub slice               : &'s [T],
+   }
+
+   #[derive(Debug)]
+   pub struct SlicePadded<'s, T: Clone, U: Clone> {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
+      pub slice               : &'s [T],
+      pub padding             : &'s U,
+   }
+
+   #[derive(Debug)]
    pub struct Nop {
       pub memory_offset_range : std::ops::Range<usize>,
       pub checksum            : Checksum,
    }
 
-   #[derive(Clone, Debug)]
+   #[derive(Debug)]
    pub struct Hook {
       pub memory_offset_range : std::ops::Range<usize>,
       pub checksum            : Checksum,
@@ -575,6 +621,248 @@ impl std::fmt::Display for Checksum {
    }
 }
 
+//////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::Item //
+//////////////////////////////////////////
+
+impl<'s, T: Clone> Patcher for method::Item<'s, T> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      let item_size = std::mem::size_of::<T>();
+
+      if memory_buffer.len() != item_size {
+         return Err(PatchError::LengthMismatch{
+            found    : memory_buffer.len(),
+            expected : item_size,
+         });
+      }
+
+      let destination = memory_buffer.as_mut_ptr() as * mut T;
+
+      unsafe{*destination = self.item.clone()};
+
+      return Ok(());
+   }
+}
+
+//////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::ItemFill //
+//////////////////////////////////////////////
+
+impl<'s, T: Clone> Patcher for method::ItemFill<'s, T> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      let residual = memory_buffer.len() % std::mem::size_of::<T>();
+
+      if residual != 0 {
+         return Err(PatchError::ResidualBytes{
+            residual : residual,
+         });
+      }
+
+      let bytes = unsafe{std::slice::from_raw_parts_mut(
+         memory_buffer.as_mut_ptr() as * mut T,
+         memory_buffer.len() / std::mem::size_of::<T>(),
+      )};
+
+      bytes.fill(self.item.clone());
+
+      return Ok(());
+   }
+}
+
+////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::ItemPadded //
+////////////////////////////////////////////////
+
+impl<'s, T: Clone, U: Clone> Patcher for method::ItemPadded<'s, T, U> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      self.alignment.clone_from_item_with_padding(
+         memory_buffer,
+         self.item.clone(),
+         self.padding.clone(),
+      )?;
+
+      return Ok(());
+   }
+}
+
+///////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::Slice //
+///////////////////////////////////////////
+
+impl<'s, T: Clone> Patcher for method::Slice<'s, T> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      let slice = unsafe{std::slice::from_raw_parts(
+         self.slice.as_ptr() as * const u8,
+         self.slice.len() * std::mem::size_of::<T>(),
+      )};
+
+      if memory_buffer.len() != slice.len() {
+         return Err(PatchError::LengthMismatch{
+            found    : slice.len(),
+            expected : memory_buffer.len(),
+         });
+      }
+
+      memory_buffer.clone_from_slice(slice);
+
+      return Ok(());
+   }
+}
+
+///////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::SliceFill //
+///////////////////////////////////////////////
+
+impl<'s, T: Clone> Patcher for method::SliceFill<'s, T> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      if memory_buffer.len() == 0 {
+         return Ok(());
+      }
+
+      if self.slice.len() == 0 {
+         return Err(PatchError::ZeroLengthType);
+      }
+
+      let slice_len_bytes = self.slice.len() * std::mem::size_of::<T>();
+
+      if memory_buffer.len() % slice_len_bytes != 0 {
+         return Err(PatchError::ResidualBytes{
+            residual : memory_buffer.len() % slice_len_bytes,
+         });
+      }
+
+      // This is how the sausage is made
+      // Have to create Vec copies so we
+      // call clone() and can still access
+      // the raw bytes.  Before you ask,
+      // std::slice::clone_from_slice()
+      // doesn't work for this use case.
+      let mut memory_buffer_view = & mut memory_buffer[..];
+      while memory_buffer_view.len() != 0 {
+         // Clone slice elements and convert to byte slice
+         let slice_clone = self.slice.to_vec();
+         let slice_clone = unsafe{std::slice::from_raw_parts(
+            slice_clone.as_ptr() as * const u8,
+            slice_len_bytes,
+         )};
+
+         // Copy to the beginning of the buffer view
+         memory_buffer_view[..slice_clone.len()].copy_from_slice(slice_clone);
+
+         // Isolate the buffer view to cut off the written bytes
+         memory_buffer_view = & mut memory_buffer_view[slice_clone.len()..];
+      }
+
+      return Ok(());
+   }
+}
+
+/////////////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::SlicePadded //
+/////////////////////////////////////////////////
+
+impl<'s, T: Clone, U: Clone> Patcher for method::SlicePadded<'s, T, U> {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      self.alignment.clone_from_slice_with_padding(
+         memory_buffer,
+         self.slice,
+         self.padding.clone(),
+      )?;
+
+      return Ok(());
+   }
+}
+
 /////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - method::Nop //
 /////////////////////////////////////////
@@ -631,163 +919,4 @@ impl Patcher for method::Hook {
       return Ok(());
    }
 }
-
-
-
-
-
-
-
-
-/*
-unsafe fn patch_buffer_item<T>(
-   buffer   : & mut [u8],
-   item     : T,
-) -> Result<()> {
-   let item_size = std::mem::size_of::<T>();
-
-   if buffer.len() != item_size {
-      return Err(PatchError::LengthMismatch{
-         found    : buffer.len(),
-         expected : item_size,
-      });
-   }
-
-   let destination = buffer.as_mut_ptr() as * mut T;
-
-   *destination = item;
-
-   return Ok(());
-}
-
-unsafe fn patch_buffer_item_fill<T>(
-   buffer   : & mut [u8],
-   item     : T,
-) -> Result<()>
-where T: Clone,
-{
-   let residual = buffer.len() % std::mem::size_of::<T>();
-
-   if residual != 0 {
-      return Err(PatchError::ResidualBytes{
-         residual : residual,
-      });
-   }
-
-   let bytes = std::slice::from_raw_parts_mut(
-      buffer.as_mut_ptr() as * mut T,
-      buffer.len() / std::mem::size_of::<T>(),
-   );
-
-   bytes.fill(item);
-
-   return Ok(());
-}
-
-unsafe fn patch_buffer_item_padded<T, U>(
-   buffer      : & mut [u8],
-   item        : T,
-   alignment   : Alignment,
-   padding     : U,
-) -> Result<()>
-where T: Clone,
-      U: Clone,
-{
-   alignment.clone_from_item_with_padding(
-      buffer,
-      item,
-      padding,
-   )?;
-
-   return Ok(());
-}
-
-unsafe fn patch_buffer_slice<T>(
-   buffer   : & mut [u8],
-   items    : & [T],
-) -> Result<()>
-where T: Clone,
-{
-   let items = std::slice::from_raw_parts(
-      items.as_ptr() as * const u8,
-      items.len() * std::mem::size_of::<T>(),
-   );
-
-   if buffer.len() != items.len() {
-      return Err(PatchError::LengthMismatch{
-         found    : items.len(),
-         expected : buffer.len(),
-      });
-   }
-
-   buffer.clone_from_slice(items);
-
-   return Ok(());
-}
-
-unsafe fn patch_buffer_slice_fill<T>(
-   buffer   : & mut [u8],
-   slice    : & [T],
-) -> Result<()>
-where T: Clone,
-{
-   if buffer.len() == 0 {
-      return Ok(());
-   }
-
-   if slice.len() == 0 {
-      return Err(PatchError::ZeroLengthType);
-   }
-
-   let slice_len_bytes = slice.len() * std::mem::size_of::<T>();
-
-   if buffer.len() % slice_len_bytes != 0 {
-      return Err(PatchError::ResidualBytes{
-         residual : buffer.len() % slice_len_bytes,
-      });
-   }
-
-   // This is how the sausage is made
-   // Have to create Vec copies so we
-   // call clone() and can still access
-   // the raw bytes.  Before you ask,
-   // std::slice::clone_from_slice()
-   // doesn't work for this use case.
-   let mut buffer_view = & mut buffer[..];
-   while buffer_view.len() != 0 {
-      // Clone slice elements and convert to byte slice
-      let slice_clone = slice.to_vec();
-      let slice_clone = std::slice::from_raw_parts(
-         slice_clone.as_ptr() as * const u8,
-         slice_len_bytes,
-      );
-
-      // Copy to the beginning of the buffer view
-      buffer_view[..slice_clone.len()].copy_from_slice(slice_clone);
-
-      // Isolate the buffer view to cut off the written bytes
-      buffer_view = & mut buffer_view[slice_clone.len()..];
-   }
-
-   return Ok(());
-}
-
-unsafe fn patch_buffer_slice_padded<T, U>(
-   buffer      : & mut [u8],
-   items       : & [T],
-   alignment   : Alignment,
-   padding     : U,
-) -> Result<()>
-where T: Clone,
-      U: Clone,
-{
-   alignment.clone_from_slice_with_padding(
-      buffer,
-      items,
-      padding,
-   )?;
-
-   return Ok(());
-}
-*/
 
