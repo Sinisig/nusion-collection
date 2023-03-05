@@ -95,11 +95,13 @@ pub fn main(
 /// valid template arguments:
 /// <ul>
 /// <li>
-/// <code>closure</code> - Substitutes
-/// the argument for the ASM-compatiable
-/// generated label for the input closure.
-/// Use this to call the closure from the
-/// ASM trampoline.
+/// <code>self</code> - The ASM-compatiable
+/// label for the ASM trampoline.
+/// </li>
+/// <li>
+/// <code>target</code> - The ASM-compatiable
+/// label for the Rust closure.  Use this argument
+/// to call your closure from your ASM trampoline.
 /// </li>
 /// </ul>
 ///
@@ -113,6 +115,38 @@ pub fn main(
 /// nor memory safety violations.  Failing
 /// to do so will lead to catastrophic bugs
 /// which will be near impossible to debug.
+///
+/// Here are the main things to be
+/// aware of when writing your ASM
+/// trampoline:
+/// <ul>
+/// <li>
+/// The hook obeys the platform's C
+/// ABI / Calling Convention.
+/// </li>
+/// <li>
+/// All input arguments follow the correct
+/// format for Rust arguments and are all
+/// valid for their context.
+/// </li>
+/// <li>
+/// All instructions overwritten by
+/// the hook are executed exactly as
+/// they were (stolen instructions)
+/// </li>
+/// <li>
+/// Any stolen instructions which use
+/// stack-relative offsets are adjusted
+/// due to the call to the ASM trampoline
+/// to point to the same memory address
+/// </li>
+/// <li>
+/// All volatile registers in use by the
+/// interrupted function are restored to
+/// their intended values after the ASM
+/// trampoline returns
+/// </li>
+/// </ul>
 #[proc_macro]
 #[proc_macro_error::proc_macro_error]
 pub fn hook(
