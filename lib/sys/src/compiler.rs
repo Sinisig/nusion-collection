@@ -67,7 +67,7 @@ pub fn nop_fill(
 /// and not any copies of it.
 pub unsafe fn hook_fill(
    memory_region  : & mut [u8],
-   target_hook    : * const core::ffi::c_void,
+   target_hook    : unsafe extern "C" fn(),
 ) -> Result<& mut [u8]> {
    return crate::cpu::compiler::hook_fill(memory_region, target_hook);
 }

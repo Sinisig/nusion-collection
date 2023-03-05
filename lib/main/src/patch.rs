@@ -152,11 +152,13 @@ pub mod method {
    /// subroutine, filling the rest of the
    /// bytes with architecture-dependent
    /// no-operation (nop) instructions.
+   /// It is recommended to use the hook!()
+   /// macro to generate your target hook.
    #[derive(Debug)]
    pub struct Hook {
       pub memory_offset_range : std::ops::Range<usize>,
       pub checksum            : Checksum,
-      pub target_hook         : * const core::ffi::c_void,
+      pub target_hook         : unsafe extern "C" fn(),
    }
 }
 
@@ -618,7 +620,7 @@ impl Checksum {
 
    /// Creates a Checksum from an
    /// existing checksum value.
-   pub fn from(
+   pub const fn from(
       checksum : u32,
    ) -> Self {
       return Self{

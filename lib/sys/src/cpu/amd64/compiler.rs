@@ -29,7 +29,7 @@ pub fn nop_fill(
 
 pub unsafe fn hook_fill(
    memory_region  : & mut [u8],
-   target_hook    : * const core::ffi::c_void,
+   target_hook    : unsafe extern "C" fn(),
 ) -> crate::compiler::Result<& mut [u8]> {
    const NOP_BYTES_TO_COMPILE_JMP : usize
       = 22; // At most 2 consecutive 11-byte nops
@@ -39,7 +39,7 @@ pub unsafe fn hook_fill(
    // Required instruction - Call to the hook
    let bytes = super::assembler::call(
       memory_view,
-      target_hook,
+      target_hook as * const core::ffi::c_void,
    )?;
    memory_view = & mut memory_view[bytes..];
 
