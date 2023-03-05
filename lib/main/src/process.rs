@@ -304,7 +304,7 @@ impl crate::patch::Patch for ModuleSnapshot {
 
    unsafe fn patch_write<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> crate::patch::Result<()>
    where P: crate::patch::Patcher,
    {
@@ -335,7 +335,7 @@ impl crate::patch::Patch for ModuleSnapshot {
 
    unsafe fn patch_write_unchecked<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> crate::patch::Result<()>
    where P: crate::patch::Patcher,
    {
@@ -356,7 +356,7 @@ impl crate::patch::Patch for ModuleSnapshot {
 
    unsafe fn patch_create<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> crate::patch::Result<Self::Container>
    where P: crate::patch::Patcher,
    {
@@ -392,7 +392,7 @@ impl crate::patch::Patch for ModuleSnapshot {
 
    unsafe fn patch_create_unchecked<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> crate::patch::Result<Self::Container>
    where P: crate::patch::Patcher,
    {

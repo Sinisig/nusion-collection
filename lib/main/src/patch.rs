@@ -1,8 +1,6 @@
 //! Module containing memory patching
 //! utilities.
 
-use core::ffi::c_void;
-
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -70,9 +68,28 @@ pub enum Alignment {
 
 /// Struct for storing and verifying
 /// stored byte data for a patch.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Checksum {
    checksum : u32,
+}
+
+/// Collection of structs which implement
+/// the Patcher trait.
+pub mod method {
+   use super::*;
+
+   #[derive(Clone, Debug)]
+   pub struct Nop {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+   }
+
+   #[derive(Clone, Debug)]
+   pub struct Hook {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub target_hook         : * const core::ffi::c_void,
+   }
 }
 
 ///////////////////////
@@ -163,7 +180,7 @@ pub trait Patch {
    /// bytes, checking against a checksum.
    unsafe fn patch_write<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> Result<()>
    where P: Patcher;
 
@@ -172,7 +189,7 @@ pub trait Patch {
    /// bytes.
    unsafe fn patch_write_unchecked<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> Result<()>
    where P: Patcher;
 
@@ -181,7 +198,7 @@ pub trait Patch {
    /// the specified container.
    unsafe fn patch_create<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> Result<Self::Container>
    where P: Patcher;
 
@@ -190,7 +207,7 @@ pub trait Patch {
    /// the specified container.
    unsafe fn patch_create_unchecked<P>(
       & mut self,
-      patcher : P,
+      patcher : & P,
    ) -> Result<Self::Container>
    where P: Patcher;
 }
@@ -201,17 +218,6 @@ pub trait Patch {
 /// trait.  This is the trait which
 /// writes bytes to memory.
 pub trait Patcher {
-   /// Builds the patch and writes it
-   /// to the memory buffer.  The input
-   /// memory buffer should be a slice
-   /// to the actual memory location.
-   /// Copying the slice can break
-   /// many patch implementations.
-   fn build_patch(
-      & self,
-      memory_buffer  : & mut [u8],
-   ) -> Result<()>;
-
    /// Returns the stored memory offset
    /// range in the patch.
    fn memory_offset_range(
@@ -223,6 +229,17 @@ pub trait Patcher {
    fn checksum(
       & self,
    ) -> Checksum;
+
+   /// Builds the patch and writes it
+   /// to the memory buffer.  The input
+   /// memory buffer should be a slice
+   /// to the actual memory location.
+   /// Copying the slice can break
+   /// many patch implementations.
+   fn build_patch(
+      & self,
+      memory_buffer  : & mut [u8],
+   ) -> Result<()>;
 }
 
 ////////////////////////////////////////
@@ -558,10 +575,71 @@ impl std::fmt::Display for Checksum {
    }
 }
 
-//////////////////////////////
-// INTERNAL HELPERS - Patch //
-//////////////////////////////
+/////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::Nop //
+/////////////////////////////////////////
 
+impl Patcher for method::Nop {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      crate::sys::compiler::nop_fill(
+         memory_buffer,
+      )?;
+      return Ok(());
+   }
+}
+
+//////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::Hook //
+//////////////////////////////////////////
+
+impl Patcher for method::Hook {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      unsafe{crate::sys::compiler::hook_fill(
+         memory_buffer,
+         self.target_hook,
+      )}?;
+      return Ok(());
+   }
+}
+
+
+
+
+
+
+
+
+/*
 unsafe fn patch_buffer_item<T>(
    buffer   : & mut [u8],
    item     : T,
@@ -711,19 +789,5 @@ where T: Clone,
 
    return Ok(());
 }
-
-unsafe fn patch_buffer_nop(
-   buffer   : & mut [u8],
-) -> Result<()> {
-   crate::sys::compiler::nop_fill(buffer)?;
-   return Ok(());
-}
-
-unsafe fn patch_buffer_hook(
-   buffer         : & mut [u8],
-   code_location  : * const c_void,
-) -> Result<()> {
-   crate::sys::compiler::hook_fill(buffer, code_location)?;
-   return Ok(());
-}
+*/
 

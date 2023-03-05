@@ -46,6 +46,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
 
+   let test_patcher = nusion::patch::method::Nop{
+      memory_offset_range  : 0x14D7CF0..0x14D7CF6,
+      checksum             : nusion::patch::Checksum::from(0xF0EF21E8),
+   };
+
+   use nusion::patch::Patch;
+   let _test_nop = unsafe{game!()?.patch_create(&test_patcher)}?;
+
    std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
 }
