@@ -175,7 +175,7 @@ impl ModuleSnapshot {
 impl ModuleSnapshot {
    fn offset_range_to_address_range<R>(
       & self,
-      offset_range   : R,
+      offset_range   : & R,
    ) -> crate::patch::Result<std::ops::Range<usize>>
    where R: RangeBounds<usize>,
    {
@@ -228,14 +228,15 @@ impl ModuleSnapshot {
 impl crate::patch::Patch for ModuleSnapshot {
    type Container = ModuleSnapshotPatchContainer;
 
-   unsafe fn patch_read_item<R, T>(
+   unsafe fn patch_read_item<T>(
       & self,
-      memory_range   : R,
+      memory_range : std::ops::Range<usize>,
    ) -> crate::patch::Result<T>
-   where R: RangeBounds<usize>,
-         T: Copy,
+   where T: Copy,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &memory_range,
+      )?;
 
       let item_byte_len = std::mem::size_of::<T>();
 
@@ -259,14 +260,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(item);
    }
 
-   unsafe fn patch_read_slice<R, T>(
+   unsafe fn patch_read_slice<T>(
       & self,
-      memory_range   : R,
+      memory_range : std::ops::Range<usize>,
    ) -> crate::patch::Result<Vec<T>>
-   where R: RangeBounds<usize>,
-         T: Copy,
+   where T: Copy,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &memory_range,
+      )?;
 
       let item_byte_len = std::mem::size_of::<T>();
 
@@ -300,16 +302,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(slice.to_vec());
    }
 
-   unsafe fn patch_write_with<R, P>(
+   unsafe fn patch_write<P>(
       & mut self,
-      memory_range   : R,
-      checksum       : crate::patch::Checksum,
-      predicate      : P,
+      patcher : P,
    ) -> crate::patch::Result<()>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   where P: crate::patch::Patcher,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &patcher.memory_offset_range(),
+      )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range,
@@ -318,28 +319,29 @@ impl crate::patch::Patch for ModuleSnapshot {
       let bytes = editor.bytes_mut();
 
       let bytes_checksum = crate::patch::Checksum::new(bytes);
+      let patch_checksum = patcher.checksum();
 
-      if bytes_checksum != checksum {
+      if bytes_checksum != patch_checksum {
          return Err(crate::patch::PatchError::ChecksumMismatch{
             found    : bytes_checksum,
-            expected : checksum,
+            expected : patch_checksum,
          });
       }
 
-      predicate(bytes)?;
-
+      patcher.build_patch(bytes)?;
+      
       return Ok(());
    }
 
-   unsafe fn patch_write_unchecked_with<R, P>(
+   unsafe fn patch_write_unchecked<P>(
       & mut self,
-      memory_range   : R,
-      predicate      : P,
+      patcher : P,
    ) -> crate::patch::Result<()>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   where P: crate::patch::Patcher,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &patcher.memory_offset_range(),
+      )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range,
@@ -347,21 +349,20 @@ impl crate::patch::Patch for ModuleSnapshot {
 
       let bytes = editor.bytes_mut();
 
-      predicate(bytes)?;
+      patcher.build_patch(bytes)?;
 
       return Ok(());
    }
 
-   unsafe fn patch_create_with<R, P>(
+   unsafe fn patch_create<P>(
       & mut self,
-      memory_range   : R,
-      checksum       : crate::patch::Checksum,
-      predicate      : P,
+      patcher : P,
    ) -> crate::patch::Result<Self::Container>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   where P: crate::patch::Patcher,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &patcher.memory_offset_range(),
+      )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range.clone(),
@@ -370,11 +371,12 @@ impl crate::patch::Patch for ModuleSnapshot {
       let bytes = editor.bytes_mut();
 
       let bytes_checksum = crate::patch::Checksum::new(bytes);
+      let patch_checksum = patcher.checksum();
 
-      if bytes_checksum != checksum {
+      if bytes_checksum != patch_checksum {
          return Err(crate::patch::PatchError::ChecksumMismatch{
             found    : bytes_checksum,
-            expected : checksum,
+            expected : patch_checksum,
          });
       }
 
@@ -383,20 +385,20 @@ impl crate::patch::Patch for ModuleSnapshot {
          old_bytes      : bytes.to_vec(),
       };
 
-      predicate(bytes)?;
+      patcher.build_patch(bytes)?;
 
       return Ok(container);
    }
 
-   unsafe fn patch_create_unchecked_with<R, P>(
+   unsafe fn patch_create_unchecked<P>(
       & mut self,
-      memory_range   : R,
-      predicate      : P,
+      patcher : P,
    ) -> crate::patch::Result<Self::Container>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> crate::patch::Result<()>
+   where P: crate::patch::Patcher,
    {
-      let address_range = self.offset_range_to_address_range(memory_range)?;
+      let address_range = self.offset_range_to_address_range(
+         &patcher.memory_offset_range(),
+      )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          address_range.clone(),
@@ -409,7 +411,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          old_bytes      : bytes.to_vec(),
       };
 
-      predicate(bytes)?;
+      patcher.build_patch(bytes)?;
 
       return Ok(container);
    }

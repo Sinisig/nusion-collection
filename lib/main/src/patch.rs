@@ -2,7 +2,6 @@
 //! utilities.
 
 use core::ffi::c_void;
-use std::ops::RangeBounds;
 
 //////////////////////
 // TYPE DEFINITIONS //
@@ -74,6 +73,156 @@ pub enum Alignment {
 #[derive(Debug, Eq, PartialEq)]
 pub struct Checksum {
    checksum : u32,
+}
+
+///////////////////////
+// TRAIT DEFINITIONS //
+///////////////////////
+
+/// Opens a region of memory for
+/// patching and applies a patch
+/// using some type implementing
+/// the Patcher trait.  This is
+/// the trait which opens up a
+/// section of memory for patching.
+///
+/// <h2 id=  patch_safety>
+/// <a href=#patch_safety>
+/// Safety
+/// </a></h2>
+///
+/// This is by far the most unsafe
+/// part of this library.  To put
+/// into perspective, this is about
+/// as unsafe as
+/// <a href=https://doc.rust-lang.org/std/mem/fn.transmute.html>
+/// std::mem::transmute()
+/// </a>, and in many ways even more
+/// unsafe.  In addition to all the
+/// memory safety concerns from transmute,
+/// any of the following will lead
+/// to undefined behavior (usually a
+/// memory access violation crash):
+///
+/// <ul>
+/// <li>
+/// The overwritten memory location
+/// is currently being accessed (race
+/// condition).
+/// </li>
+///
+/// <li>
+/// The overwritten memory location
+/// is not a valid place to overwrite
+/// with new data.
+/// </li>
+///
+/// <li>
+/// The data used to overwrite the
+/// memory location is not valid for
+/// its purpose (ex: overwriting code
+/// with non-code).
+/// </li>
+///
+/// <li>
+/// Any reference to code or data
+/// in the patch data goes out of
+/// scope, either by being dropped
+/// by the compiler or by unloading
+/// the module containing the code
+/// or data.
+/// </li>
+/// </ul>
+pub trait Patch {
+   /// The container used to store the
+   /// patch metadata.  It is recommended
+   /// to make this container store the
+   /// overwritten byte data and then
+   /// implement the Drop trait to then
+   /// restore the overwritten bytes.
+   type Container;
+
+   /// Reads the bytes stored in the
+   /// memory range as a single value.
+   unsafe fn patch_read_item<T>(
+      & self,
+      memory_range : std::ops::Range<usize>,
+   ) -> Result<T>
+   where T: Copy;
+
+   /// Reads the bytes stored in the
+   /// memory range as a slice of values.
+   unsafe fn patch_read_slice<T>(
+      & self,
+      memory_range : std::ops::Range<usize>,
+   ) -> Result<Vec<T>>
+   where T: Copy;
+
+   /// Writes a patch using a patcher
+   /// without saving the overwritten
+   /// bytes, checking against a checksum.
+   unsafe fn patch_write<P>(
+      & mut self,
+      patcher : P,
+   ) -> Result<()>
+   where P: Patcher;
+
+   /// Writes a patch using a patcher
+   /// without saving the overwritten
+   /// bytes.
+   unsafe fn patch_write_unchecked<P>(
+      & mut self,
+      patcher : P,
+   ) -> Result<()>
+   where P: Patcher;
+
+   /// Creates a patch using a patcher,
+   /// storing the overwritten bytes in
+   /// the specified container.
+   unsafe fn patch_create<P>(
+      & mut self,
+      patcher : P,
+   ) -> Result<Self::Container>
+   where P: Patcher;
+
+   /// Creates a patch using a patcher,
+   /// storing the overwritten bytes in
+   /// the specified container.
+   unsafe fn patch_create_unchecked<P>(
+      & mut self,
+      patcher : P,
+   ) -> Result<Self::Container>
+   where P: Patcher;
+}
+
+/// Trait for storing patch metadata
+/// and later applying the patch to
+/// some type implementing the Patch
+/// trait.  This is the trait which
+/// writes bytes to memory.
+pub trait Patcher {
+   /// Builds the patch and writes it
+   /// to the memory buffer.  The input
+   /// memory buffer should be a slice
+   /// to the actual memory location.
+   /// Copying the slice can break
+   /// many patch implementations.
+   fn build_patch(
+      & self,
+      memory_buffer  : & mut [u8],
+   ) -> Result<()>;
+
+   /// Returns the stored memory offset
+   /// range in the patch.
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize>;
+
+   /// Returns the stored checksum
+   /// for the patch.
+   fn checksum(
+      & self,
+   ) -> Checksum;
 }
 
 ////////////////////////////////////////
@@ -576,706 +725,5 @@ unsafe fn patch_buffer_hook(
 ) -> Result<()> {
    crate::sys::compiler::hook_fill(buffer, code_location)?;
    return Ok(());
-}
-
-//////////////////////////////
-// TRAIT DEFINITION - Patch //
-//////////////////////////////
-
-/// Implements various memory patching
-/// functions for a given type.
-///
-/// Currently, there are the following
-/// patch types, each with respective
-/// write/create and checked/unchecked
-/// versions:
-/// <ul>
-/// <li>
-/// <b>Item</b> - Writes a single item
-/// to the memory region.  If the length
-/// of the memory region doesn't match
-/// the size of the item in bytes, an
-/// error is returned.
-/// </li>
-///
-/// <li>
-/// <b>Item Fill</b> - Fill the memory
-/// region with a single value.  If the
-/// memory region can't be evenly filled,
-/// an error is returned.
-/// </li>
-///
-/// <li>
-/// <b>Item Padded</b> - Writes a single
-/// item to a memory region with the rest
-/// of the memory region filled with a
-/// padding value.  The position of the
-/// item in the memory region is controlled
-/// by an alignment argument.
-/// </li>
-///
-/// <li>
-/// <b>Slice</b> - Writes a single slice
-/// to the memory region.  If the length
-/// of the slice in bytes doesn't match
-/// the length of the memory region, an
-/// error is returned.
-/// </li>
-///
-/// <li>
-/// <b>Slice Fill</b> - Fill the memory
-/// region with a single slice.  If the
-/// memory region can't be evenly filled,
-/// an error is returned.
-/// </li>
-///
-/// <li>
-/// <b>Slice Padded</b> - Writes a single
-/// slice to a memory region with the rest
-/// of the memory region filled with a
-/// padding value.  The position of the
-/// slice in the memory region is controlled
-/// by an alignment argument.
-/// </li>
-///
-/// <li>
-/// <b>Nop</b> - Fill the memory region with
-/// the architecture-dependent no-operation
-/// instruction.  If it is impossible to
-/// fill every byte of the memory region
-/// with no-operation instructions, an error
-/// is returned.
-/// </li>
-/// 
-/// <li>
-/// <b>Hook</b> - Compiles a call instruction
-/// to a given code location in the memory
-/// region and a jump instruction to skip
-/// over the remaining bytes.  If it is
-/// impossible to compile the call instruction
-/// into the given memory region, an error
-/// is returned.
-/// </li>
-///
-/// </ul>
-///
-/// <h2 id=  patch_safety>
-/// <a href=#patch_safety>
-/// Safety
-/// </a></h2>
-///
-/// This is by far the most unsafe
-/// part of this library.  To put
-/// into perspective, this is about
-/// as unsafe as
-/// <a href=https://doc.rust-lang.org/std/mem/fn.transmute.html>
-/// std::mem::transmute()
-/// </a>, and in many ways even more
-/// unsafe.  In addition to all the
-/// memory safety concerns from transmute,
-/// any of the following will lead
-/// to undefined behavior (usually a
-/// memory access violation crash):
-///
-/// <ul>
-/// <li>
-/// The overwritten memory location
-/// is currently being accessed (race
-/// condition).
-/// </li>
-///
-/// <li>
-/// The overwritten memory location
-/// is not a valid place to overwrite
-/// with new data.
-/// </li>
-///
-/// <li>
-/// The data used to overwrite the
-/// memory location is not valid for
-/// its purpose (ex: overwriting code
-/// with non-code).
-/// </li>
-///
-/// <li>
-/// Any reference to code or data
-/// in the patch data goes out of
-/// scope, either by being dropped
-/// by the compiler or by unloading
-/// the module containing the code
-/// or data.
-/// </li>
-/// </ul>
-pub trait Patch {
-   ////////////////////
-   // REQUIRED ITEMS //
-   ////////////////////
-
-   /// The container used to store the
-   /// patch metadata.  It is recommended
-   /// to make this container store the
-   /// overwritten byte data and then
-   /// implement the Drop trait to then
-   /// restore the overwritten bytes.
-   type Container;
-
-   /// Reads the bytes stored in the
-   /// memory range as a single value.
-   unsafe fn patch_read_item<R, T>(
-      & self,
-      memory_range   : R,
-   ) -> Result<T>
-   where R: RangeBounds<usize>,
-         T: Copy;
-
-   /// Reads the bytes stored in the
-   /// memory range as a slice of values.
-   unsafe fn patch_read_slice<R, T>(
-      & self,
-      memory_range   : R,
-   ) -> Result<Vec<T>>
-   where R: RangeBounds<usize>,
-         T: Copy;
-
-   /// Writes values to a memory range
-   /// using a predicate, checking
-   /// against a checksum.
-   unsafe fn patch_write_with<R, P>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      predicate      : P,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> Result<()>;
-
-   /// Writes values to a memory range
-   /// using a predicate without checking
-   /// against a checksum.
-   unsafe fn patch_write_unchecked_with<R, P>(
-      & mut self,
-      memory_range   : R,
-      predicate      : P,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> Result<()>;
-
-   /// Writes values to a memory range
-   /// using a predicate, checking
-   /// against a checksum and storing
-   /// the old bytes in Self::Container.
-   unsafe fn patch_create_with<R, P>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      predicate      : P,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> Result<()>;
-
-   /// Writes values to a memory range
-   /// using a predicate, storing the
-   /// old bytes in Self::Container
-   /// without checking against a
-   /// checksum.
-   unsafe fn patch_create_unchecked_with<R, P>(
-      & mut self,
-      memory_range   : R,
-      predicate      : P,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         P: FnOnce(& mut [u8]) -> Result<()>;
-
-   ////////////////////
-   // PROVIDED ITEMS //
-   ////////////////////
-
-   // Item ////////////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_item<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_item<R, T>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_item<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_item<R, T>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   // Item Fill ///////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_item_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item_fill(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_item_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item_fill(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_item_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item_fill(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_item_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item_fill(buffer, item)?;
-         return Ok(());
-      });
-   }
-
-   // Item Padded /////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_item_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item_padded(buffer, item, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_item_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item_padded(buffer, item, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_item_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      item           : T,
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_item_padded(buffer, item, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_item_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      item           : T,
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_item_padded(buffer, item, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   // Slice ///////////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_slice<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_slice<R, T>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_slice<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_slice<R, T>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   // Slice Fill //////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_slice_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice_fill(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_slice_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice_fill(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_slice_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice_fill(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_slice_fill<R, T>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice_fill(buffer, slice)?;
-         return Ok(());
-      });
-   }
-
-   // Slice Padded ////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_slice_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice_padded(buffer, slice, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_slice_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice_padded(buffer, slice, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_slice_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      slice          : & [T],
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_slice_padded(buffer, slice, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_slice_padded<R, T, U>(
-      & mut self,
-      memory_range   : R,
-      slice          : & [T],
-      alignment      : Alignment,
-      padding        : U,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-         T: Clone,
-         U: Clone,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_slice_padded(buffer, slice, alignment, padding)?;
-         return Ok(());
-      });
-   }
-
-   // Nop /////////////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_nop<R>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_nop(buffer)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_nop<R>(
-      & mut self,
-      memory_range   : R,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_nop(buffer)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_nop<R>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_nop(buffer)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_nop<R>(
-      & mut self,
-      memory_range   : R,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_nop(buffer)?;
-         return Ok(());
-      });
-   }
-
-   // Hook ////////////////////////////////////////////////////////////////////
-
-   unsafe fn patch_write_hook<R>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      code_location  : * const c_void,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_hook(buffer, code_location)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_write_unchecked_hook<R>(
-      & mut self,
-      memory_range   : R,
-      code_location  : * const c_void,
-   ) -> Result<()>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_write_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_hook(buffer, code_location)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_hook<R>(
-      & mut self,
-      memory_range   : R,
-      checksum       : Checksum,
-      code_location  : * const c_void,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_with(self, memory_range, checksum, |buffer| {
-         patch_buffer_hook(buffer, code_location)?;
-         return Ok(());
-      });
-   }
-
-   unsafe fn patch_create_unchecked_hook<R>(
-      & mut self,
-      memory_range   : R,
-      code_location  : * const c_void,
-   ) -> Result<Self::Container>
-   where R: RangeBounds<usize>,
-   {
-      return Self::patch_create_unchecked_with(self, memory_range, |buffer| {
-         patch_buffer_hook(buffer, code_location)?;
-         return Ok(());
-      });
-   }
 }
 
