@@ -46,49 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
 
-   // Test function hook which intercepts
-   // the ammo decrement for most weapons
-   use nusion::patch::Patch;
-   let _ammo_hook = unsafe{game!()?.patch_create_hook(
-      0x14D7CDB..0x14D7CF9,
-      nusion::patch::Checksum::from(0x8CC8AE3B),
-      TEST_HOOK_AMMO_TRAMPOLINE,
-   )}?;
-
    std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
-}
-
-#[nusion::hook(
-   "
-   // Stolen bytes
-   sub      eax,[rcx+0x630]
-   xor      ebp,ebp
-   test     eax,eax
-   mov      [rsp+0xC0],r12 // +0x08 because of call
-   cmovle   eax,ebp
-   mov      [rcx+0x648],eax
-   
-   // Store volatiles and align stack
-   push     rcx
-
-   // Call the hook
-   lea      rcx,[rcx+0x648]
-   call     {hook}
-
-   // Restore stack and volatiles
-   pop      rcx
-   mov      rax,[rcx]
-
-   // Return gracefully
-   ret
-   ",
-   TEST_HOOK_AMMO_TRAMPOLINE,
-)]
-fn test_hook_ammo(ammo : & mut i32) {
-   *ammo += 2; // Account for decrement and add one to increment
-   
-   println!("Received ammo hook! New value: {ammo}");
-   return;
 }
 
