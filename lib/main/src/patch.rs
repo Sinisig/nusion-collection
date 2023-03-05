@@ -73,11 +73,13 @@ pub struct Checksum {
    checksum : u32,
 }
 
-/// Collection of structs which implement
-/// the Patcher trait.
+/// Collection of provided patcher
+/// structs which implement the
+/// Patcher trait.
 pub mod method {
    use super::*;
 
+   /// Clones a single item.
    #[derive(Debug)]
    pub struct Item<'s, T: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -85,6 +87,8 @@ pub mod method {
       pub item                : &'s T,
    }
 
+   /// Repeatedly clones a single item
+   /// to fill the memory buffer.
    #[derive(Debug)]
    pub struct ItemFill<'s, T: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -92,6 +96,10 @@ pub mod method {
       pub item                : &'s T,
    }
 
+   /// Positions and clones a single
+   /// element according to the alignment
+   /// and fills the surrounding bytes
+   /// with the cloned padding value.
    #[derive(Debug)]
    pub struct ItemPadded<'s, T: Clone, U: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -101,6 +109,7 @@ pub mod method {
       pub padding             : &'s U,
    }
 
+   /// Clones a single slice.
    #[derive(Debug)]
    pub struct Slice<'s, T: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -108,6 +117,8 @@ pub mod method {
       pub slice               : &'s [T],
    }
 
+   /// Repeatedly clones a single slice
+   /// to fill the memory buffer.
    #[derive(Debug)]
    pub struct SliceFill<'s, T: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -115,6 +126,10 @@ pub mod method {
       pub slice               : &'s [T],
    }
 
+   /// Positions and clones a single
+   /// slice according to the alignment
+   /// and fills the surrounding bytes
+   /// with the cloned padding value.
    #[derive(Debug)]
    pub struct SlicePadded<'s, T: Clone, U: Clone> {
       pub memory_offset_range : std::ops::Range<usize>,
@@ -124,12 +139,19 @@ pub mod method {
       pub padding             : &'s U,
    }
 
+   /// Compiles a block of architecture-dependent
+   /// no-operation (nop) machine-code
+   /// instructions.
    #[derive(Debug)]
    pub struct Nop {
       pub memory_offset_range : std::ops::Range<usize>,
       pub checksum            : Checksum,
    }
 
+   /// Compiles a call to a given assembly
+   /// subroutine, filling the rest of the
+   /// bytes with architecture-dependent
+   /// no-operation (nop) instructions.
    #[derive(Debug)]
    pub struct Hook {
       pub memory_offset_range : std::ops::Range<usize>,
