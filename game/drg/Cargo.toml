@@ -10,5 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 nusion = { path = "../../lib/main" }
-lazy_static = "1.4.0"
 

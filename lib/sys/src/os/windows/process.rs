@@ -5,7 +5,11 @@ use crate::process::{ProcessError, Result};
 
 use winapi::{
    shared::{
+      basetsd::{
+         ULONG_PTR,
+      },
       minwindef::{
+         BYTE,
          DWORD,
          HMODULE,
          FALSE,
@@ -134,10 +138,18 @@ impl ProcessSnapshot {
       };
 
       // Get the process info for the first process
-      let mut process_entry = unsafe{
-         std::mem::MaybeUninit::<PROCESSENTRY32>::uninit().assume_init()
+      let mut process_entry = PROCESSENTRY32{
+         dwSize               : std::mem::size_of::<PROCESSENTRY32>() as DWORD,
+         cntUsage             : 0,
+         th32ProcessID        : 0,
+         th32DefaultHeapID    : 0 as ULONG_PTR,
+         th32ModuleID         : 0,
+         cntThreads           : 0,
+         th32ParentProcessID  : 0,
+         pcPriClassBase       : 0,
+         dwFlags              : 0,
+         szExeFile            : [0; 260],
       };
-      process_entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as DWORD;
       if unsafe{Process32First(process_snapshot, & mut process_entry)} == FALSE {
          // TODO: Proper error handling 
          try_close_handle!(process_snapshot, "process snapshot");
@@ -212,10 +224,18 @@ impl ModuleSnapshot {
       }
 
       // Get the first module entry
-      let mut module_entry = unsafe{
-         std::mem::MaybeUninit::<MODULEENTRY32>::uninit().assume_init()
+      let mut module_entry = MODULEENTRY32{
+         dwSize         : std::mem::size_of::<MODULEENTRY32>() as DWORD,
+         th32ModuleID   : 0,
+         th32ProcessID  : 0,
+         GlblcntUsage   : 0,
+         ProccntUsage   : 0,
+         modBaseAddr    : 0 as * mut BYTE,
+         modBaseSize    : 0,
+         hModule        : 0 as HMODULE,
+         szModule       : [0; 256],
+         szExePath      : [0; 260],
       };
-      module_entry.dwSize = std::mem::size_of::<MODULEENTRY32>() as DWORD;
       if unsafe{Module32First(module_snapshot, & mut module_entry)} == FALSE {
          // TODO: Better error propagation
          try_close_handle!(module_snapshot, "module snapshot");

@@ -107,7 +107,6 @@ dependencies = [
 name = "nusion-game-drg"
 version = "0.0.1+alpha"
 dependencies = [
- "lazy_static",
  "nusion",
 ]
 
