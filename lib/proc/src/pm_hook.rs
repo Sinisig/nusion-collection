@@ -48,13 +48,15 @@ pub fn hook(
             core::arch::global_asm!(#asm_template);
    
             // Declaration of the assembly function
+            #[no_mangle]
+            #[allow(non_snake_case)]
             extern "C" {
-               #[no_mangle]
                pub fn #asm_template_ident();
             }
 
             // Construct a function from the closure
             #[no_mangle]
+            #[allow(non_snake_case)]
             pub extern "C" fn #closure_ident(
                #closure_input
             ) #closure_output {

@@ -169,14 +169,14 @@ pub fn hook(
 /// Note
 /// </a></h2>
 ///
-/// Due to the const version of certain
-/// slice manipulating functions being
-/// added in later versions of the standard
-/// library, this macro may only be used
-/// to initialize a constant variable when
-/// using version 1.64 or greater of the
-/// standard library.  Using an earlier
-/// version will result in a compile error.
+/// Due to issues with constructing
+/// the byte slice, the macro output
+/// cannot be used to initialize a
+/// const variable.  This can be
+/// side-stepped by using the
+/// <a href=https://docs.rs/lazy_static/1.4.0/lazy_static/
+/// ><code>lazy_static!()</code></a>
+/// macro to initialize at runtime.
 ///
 /// <h2 id=  asm_bytes_safety>
 /// <a href=#asm_bytes_safety>
