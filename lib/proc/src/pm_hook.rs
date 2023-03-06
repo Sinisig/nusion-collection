@@ -6,24 +6,16 @@ pub fn hook(
    // Parse input item as a string literal and closure
    let input = syn::parse_macro_input!(item as HookInput);
 
-   // Generate a UUID based on the input
-   // and its location in the source file.
-   // This is to prevent clashes with similar
-   // invocations.
-   use core::hash::{Hash, Hasher};
-   let mut uuid_hasher = hashers::fnv::FNV1aHasher64::default();
-   input.asm_template                        .hash(& mut uuid_hasher);
-   input.closure                             .hash(& mut uuid_hasher);
-   input.asm_template.span().start()         .hash(& mut uuid_hasher);
-   input.asm_template.span().end()           .hash(& mut uuid_hasher);
-   input.closure.or1_token.spans[0].start()  .hash(& mut uuid_hasher);
-   input.closure.or2_token.spans[0].start()  .hash(& mut uuid_hasher);
-   let uuid = uuid_hasher.finish();
+   // Generate input UUID
+   let uuid = input.generate_uuid(); 
 
    // Generate identifiers for the private
    // module, ASM trampoline, and closure
    const IDENT_PREFIX : &'static str = "__nusion_hook";
    let ident = HookIdentifier{
+      module      : quote::format_ident!(
+         "{IDENT_PREFIX}_{:X}_module",       uuid,
+      ),
       trampoline  : quote::format_ident!(
          "{IDENT_PREFIX}_{:X}_trampoline",   uuid,
       ),
@@ -36,43 +28,48 @@ pub fn hook(
    let asm_template = input.parse_asm_template(&ident);
   
    // Unpack various variables for use in the quote invocation
+   let module_ident        = &ident.module;
    let asm_template_ident  = &ident.trampoline;
    let closure_ident       = &ident.closure;
    let closure_input       = &input.closure.inputs;
    let closure_output      = &input.closure.output;
    let closure_body        = &input.closure.body;
 
-   // Generate the Rust code for the hook
-   let codegen = proc_macro::TokenStream::from(quote::quote!{
+   // Finally, generate the Rust code for the hook
+   return proc_macro::TokenStream::from(quote::quote!{
       // Create scope for functions
       {
-         // Assembly trampoline code gen
-         core::arch::global_asm!(#asm_template);
+         // Create a module to store all our
+         // functions in.  This is an easy way
+         // to fudge our way around issues with
+         // global_asm!() being used in a statement
+         mod #module_ident {
+            // Assembly trampoline code gen
+            core::arch::global_asm!(#asm_template);
+   
+            // Declaration of the assembly function
+            extern "C" {
+               #[no_mangle]
+               pub fn #asm_template_ident();
+            }
 
-         // Declaration of the assembly function
-         extern "C" {
+            // Construct a function from the closure
             #[no_mangle]
-            fn #asm_template_ident();
-         }
-
-         // Construct a function from the closure
-         #[no_mangle]
-         pub extern "C" fn #closure_ident(
-            #closure_input
-         ) #closure_output {
-            #closure_body
+            pub extern "C" fn #closure_ident(
+               #closure_input
+            ) #closure_output {
+               #closure_body
+            }
          }
 
          // Finally, we return the asm template pointer
-         #asm_template_ident
+         #module_ident::#asm_template_ident
       }
    });
-
-   // Return the newly constructed code
-   return codegen;
 }
 
 struct HookIdentifier {
+   pub module     : syn::Ident,
    pub trampoline : syn::Ident,
    pub closure    : syn::Ident,
 }
@@ -83,13 +80,35 @@ struct HookInput {
 }
 
 impl HookInput {
+   pub fn generate_uuid(
+      & self
+   ) -> u64 {
+      use core::hash::{Hash, Hasher};
+
+      let mut uuid_hasher = hashers::fnv::FNV1aHasher64::default();
+
+      // In order to have the lowest possible
+      // chance of generating duplicate hashes,
+      // we take into account the ASM string
+      // literal, closure content, file position
+      // of literal, and file position of closure.
+      self.asm_template                      .hash(& mut uuid_hasher);
+      self.closure                           .hash(& mut uuid_hasher);
+      self.asm_template.span().start()       .hash(& mut uuid_hasher);
+      self.asm_template.span().end()         .hash(& mut uuid_hasher);
+      self.closure.or1_token.spans[0].start().hash(& mut uuid_hasher);
+      self.closure.or2_token.spans[0].start().hash(& mut uuid_hasher);
+
+      return uuid_hasher.finish();
+   }
+
    pub fn parse_asm_template(
       & self,
       identifiers : & HookIdentifier,
    ) -> syn::LitStr {
       lazy_static::lazy_static!{
          static ref ARG_SEARCHER : regex::Regex = regex::Regex::new(
-            r"\{[A-Za-z0-9 ]*?\}"
+            r"\{[^\{\}]*?\}"
          ).expect("Failed to parse Regex, this is a bug");
       };
 
