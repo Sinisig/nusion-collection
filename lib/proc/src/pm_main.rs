@@ -49,6 +49,106 @@ enum EntrypointReturnType {
    Dynamic, // -> Result<(), Box<dyn std::error::Error>>
 }
 
+/// Gets the span for a visibility
+/// enum
+fn span_vis(
+   vis : & syn::Visibility
+) -> proc_macro2::Span {
+   use syn::Visibility::*;
+
+   return match vis {
+      Public      (tok)
+         => tok.pub_token.span,
+      Crate       (tok)
+         => tok.crate_token.span,
+      Restricted  (tok)
+         => tok.paren_token.span,
+      Inherited
+         => proc_macro2::Span::call_site(),
+   };
+}
+
+/// Gets the span for a type enum
+fn span_type(
+   ty : & syn::Type,
+) -> proc_macro2::Span {
+   use syn::Type::*;
+
+   return match ty {
+      Array       (ar)
+         => ar.bracket_token.span,
+
+      BareFn      (bf)
+         => bf.fn_token.span,
+
+      Group       (gp)
+         => gp.group_token.span,
+
+      ImplTrait   (it)
+         => it.impl_token.span,
+
+      Infer       (ud)
+         => ud.underscore_token.span,
+
+      Macro       (mc)
+         => mc.mac.bang_token.spans[0],
+
+      Never       (nv)
+         => nv.bang_token.span,
+
+      Paren       (pn)
+         => pn.paren_token.span,
+
+      Path        (pa)
+         => pa.path.segments.first().unwrap().ident.span(),
+
+      Ptr         (pt)
+         => pt.star_token.span,
+
+      Reference   (rf)
+         => rf.and_token.span,
+
+      Slice       (sc)
+         => sc.bracket_token.span,
+
+      TraitObject (to)
+         => match to.dyn_token {
+            Some(dy) => dy.span,
+            None     => proc_macro2::Span::call_site(),
+         },
+
+      Tuple       (tp)
+         => tp.paren_token.span,
+
+      _
+         => proc_macro2::Span::call_site(),
+   };
+}
+
+/// Gets the span for a generic argument
+fn span_generic_argument(
+   ga : & syn::GenericArgument,
+) -> proc_macro2::Span {
+   use syn::GenericArgument::*;
+
+   return match ga {
+      Lifetime    (lt)
+         => lt.apostrophe,
+
+      Type        (ty)
+         => span_type(&ty),
+
+      Const       (_) 
+         => proc_macro2::Span::call_site(),
+
+      Binding     (bd)
+         => bd.eq_token.span,
+
+      Constraint  (ct)
+         => ct.colon_token.span,
+   };
+}
+
 impl syn::parse::Parse for EntrypointInfo {
    fn parse(
       input : syn::parse::ParseStream<'_>,
@@ -61,25 +161,11 @@ impl syn::parse::Parse for EntrypointInfo {
 
       // Check that the visibility is private
       match &func.vis {
-         syn::Visibility::Public    (tok) => {
-            let span = tok.pub_token.span.unwrap();
-            proc_macro_error::emit_error!(
-               span, "visibility should be private",
-            );
-         },
-         syn::Visibility::Crate     (tok) => {
-            let span = tok.crate_token.span.unwrap();
-            proc_macro_error::emit_error!(
-               span, "visibility should be private",
-            );
-         },
-         syn::Visibility::Restricted(tok) => {
-            let span = tok.paren_token.span.unwrap();
-            proc_macro_error::emit_error!(
-               span, "visibility should be private",
-            );
-         },
-         syn::Visibility::Inherited       => (),
+         syn::Visibility::Inherited => (),
+         
+         _ => proc_macro_error::emit_error!(
+            span_vis(&func.vis), "visibility should be private",
+         ),         
       }
 
       // Check that the identifier is named 'main'
@@ -101,7 +187,7 @@ impl syn::parse::Parse for EntrypointInfo {
       // If there is no return type, construct
       // a void return type main function.
       // Otherwise unwrap the stored type
-      let (arrow_token, output) = match &func.sig.output {
+      let (_, output) = match &func.sig.output {
          syn::ReturnType::Default => {
             return Ok(Self{
                func     : func,
@@ -112,67 +198,14 @@ impl syn::parse::Parse for EntrypointInfo {
       };
 
       // Make sure the type is a type path
-      let output = match &**output {
-         syn::Type::Path(path) => &path.path,
-         
-         syn::Type::Array        (ar) => {
-            let span = ar.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::BareFn       (bf) => {
-            let span = bf.fn_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         }
-         syn::Type::Group        (gp) => {
-            let span = gp.group_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::ImplTrait    (it) => {
-            let span = it.impl_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Infer        (ud) => {
-            let span = ud.underscore_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Macro        (mc) => {
-            let span = mc.mac.bang_token.spans[0];
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Never        (nv) => {
-            let span = nv.bang_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Paren        (pn) => {
-            let span = pn.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Ptr          (pt) => {
-            let span = pt.star_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Reference    (rf) => {
-            let span = rf.and_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Slice        (sc) => {
-            let span = sc.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::TraitObject  (to) => {
-            let span = match to.dyn_token {
-               Some(dy) => dy.span,
-               None     => arrow_token.spans[1],
-            };
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Tuple        (tp) => {
-            let span = tp.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         _ => {
-            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
-         },
+      let output = if let syn::Type::Path(p) = &**output {
+         &p.path
+      } else {
+         proc_macro_error::abort!(
+            span_type(&**output),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Look at the last identifier
@@ -208,90 +241,27 @@ impl syn::parse::Parse for EntrypointInfo {
 
       // Verify the first generic argument
       // is a type
-      let output_arg_ok = match output_args.args.first().unwrap() {
-         syn::GenericArgument::Type(ty) => ty,
-
-         syn::GenericArgument::Lifetime   (lt) => {
-            let span = lt.apostrophe;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Const      (_)  => {
-            let span = output.ident.span();
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Binding    (bd) => {
-            let span = bd.eq_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Constraint (ct) => {
-            let span = ct.colon_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_ok = output_args.args.first().unwrap();
+      let output_arg_ok = if let syn::GenericArgument::Type(ty) = output_arg_ok {
+         ty
+      } else {
+         proc_macro_error::abort!(
+            span_generic_argument(output_arg_ok),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
-
+      
       // Verify the first generic argument
       // is a tuple type
-      let output_arg_ok = match output_arg_ok {
-         syn::Type::Tuple(tp) => tp,
-         
-         syn::Type::Array        (ar) => {
-            let span = ar.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::BareFn       (bf) => {
-            let span = bf.fn_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         }
-         syn::Type::Group        (gp) => {
-            let span = gp.group_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::ImplTrait    (it) => {
-            let span = it.impl_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Infer        (ud) => {
-            let span = ud.underscore_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Macro        (mc) => {
-            let span = mc.mac.bang_token.spans[0];
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Never        (nv) => {
-            let span = nv.bang_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Paren        (pn) => {
-            let span = pn.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Path         (ph) => {
-            let span = ph.path.segments.last().unwrap().ident.span();
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Ptr          (pt) => {
-            let span = pt.star_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Reference    (rf) => {
-            let span = rf.and_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Slice        (sc) => {
-            let span = sc.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::TraitObject  (to) => {
-            let span = match to.dyn_token {
-               Some(dy) => dy.span,
-               None     => arrow_token.spans[1],
-            };
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         _ => {
-            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_ok = if let syn::Type::Tuple(tp) = output_arg_ok {
+         tp
+      } else {
+         proc_macro_error::abort!(
+            span_type(output_arg_ok),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Verify the tuple argument
@@ -303,90 +273,27 @@ impl syn::parse::Parse for EntrypointInfo {
 
       // Verify the second generic
       // argument is a type
-      let output_arg_err = match output_args.args.last().unwrap() {
-         syn::GenericArgument::Type(ty) => ty,
-
-         syn::GenericArgument::Lifetime   (lt) => {
-            let span = lt.apostrophe;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Const      (_)  => {
-            let span = output.ident.span();
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Binding    (bd) => {
-            let span = bd.eq_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Constraint (ct) => {
-            let span = ct.colon_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_err = output_args.args.last().unwrap();
+      let output_arg_err = if let syn::GenericArgument::Type(ty) = output_arg_err {
+         ty
+      } else {
+         proc_macro_error::abort!(
+            span_generic_argument(output_arg_err),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Verify the type is some
       // kind of path
-      let output_arg_err = match output_arg_err {
-         syn::Type::Path(path) => &path.path,
-         
-         syn::Type::Array        (ar) => {
-            let span = ar.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::BareFn       (bf) => {
-            let span = bf.fn_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         }
-         syn::Type::Group        (gp) => {
-            let span = gp.group_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::ImplTrait    (it) => {
-            let span = it.impl_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Infer        (ud) => {
-            let span = ud.underscore_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Macro        (mc) => {
-            let span = mc.mac.bang_token.spans[0];
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Never        (nv) => {
-            let span = nv.bang_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Paren        (pn) => {
-            let span = pn.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Ptr          (pt) => {
-            let span = pt.star_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Reference    (rf) => {
-            let span = rf.and_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Slice        (sc) => {
-            let span = sc.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::TraitObject  (to) => {
-            let span = match to.dyn_token {
-               Some(dy) => dy.span,
-               None     => arrow_token.spans[1],
-            };
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Tuple        (tp) => {
-            let span = tp.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         _ => {
-            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_err = if let syn::Type::Path(p) = output_arg_err {
+         &p.path
+      } else {
+         proc_macro_error::abort!(
+            span_type(output_arg_err),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Get the ending path item for the
@@ -425,86 +332,26 @@ impl syn::parse::Parse for EntrypointInfo {
       }
 
       // Verify the generic argument is a type
-      let output_arg_err = match output_arg_err.args.last().unwrap() {
-         syn::GenericArgument::Type(ty) => ty,
-
-         syn::GenericArgument::Lifetime   (lt) => {
-            let span = lt.apostrophe;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Const      (_)  => {
-            let span = output.ident.span();
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Binding    (bd) => {
-            let span = bd.eq_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::GenericArgument::Constraint (ct) => {
-            let span = ct.colon_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_err = output_arg_err.args.last().unwrap();
+      let output_arg_err = if let syn::GenericArgument::Type(ty) = output_arg_err {
+         ty
+      } else {
+         proc_macro_error::abort!(
+            span_generic_argument(output_arg_err),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Verify the type is a trait object
-      let output_arg_err = match output_arg_err {
-         syn::Type::TraitObject(to) => to,
-
-         syn::Type::Array        (ar) => {
-            let span = ar.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::BareFn       (bf) => {
-            let span = bf.fn_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         }
-         syn::Type::Group        (gp) => {
-            let span = gp.group_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::ImplTrait    (it) => {
-            let span = it.impl_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Infer        (ud) => {
-            let span = ud.underscore_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Macro        (mc) => {
-            let span = mc.mac.bang_token.spans[0];
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Never        (nv) => {
-            let span = nv.bang_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Paren        (pn) => {
-            let span = pn.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Path         (ph) => {
-            let span = ph.path.segments.last().unwrap().ident.span();
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Ptr          (pt) => {
-            let span = pt.star_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Reference    (rf) => {
-            let span = rf.and_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Slice        (sc) => {
-            let span = sc.bracket_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         syn::Type::Tuple        (tp) => {
-            let span = tp.paren_token.span;
-            proc_macro_error::abort!(span, "{}", OUTPUT_ERROR_MSG);
-         },
-         _ => {
-            proc_macro_error::abort_call_site!("{}", OUTPUT_ERROR_MSG);
-         },
+      let output_arg_err = if let syn::Type::TraitObject(to) = output_arg_err {
+         to
+      } else {
+         proc_macro_error::abort!(
+            span_type(output_arg_err),
+            "{}",
+            OUTPUT_ERROR_MSG,
+         );
       };
 
       // Verify there is only one trait bound

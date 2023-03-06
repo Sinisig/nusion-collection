@@ -45,17 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       addr = game!()?.address_range().end,
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
-
-   let test_patcher : nusion::patch::method::Asm = nusion::patch::method::Asm{
-      memory_offset_range  : 0x14D7CDB..0x14D7CF9,
-      checksum             : nusion::patch::Checksum::from(0x8CC8AE3B),
-      alignment            : nusion::patch::Alignment::Center,
-      asm_bytes            : nusion::asm_bytes!("xor eax,eax"),
-   };
-
-   use nusion::patch::Patch;
-   let _test_hook_ammo = unsafe{game!()?.patch_create(&test_patcher)}?;
-
+ 
    std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
 }
