@@ -363,7 +363,11 @@ macro_rules! execute_main_result {
 impl Environment {
    /// Initializes the thread environment
    /// and executes an entrypoint with no
-   /// return type.
+   /// return type.  If the process name
+   /// does not match any of those in
+   /// process whitelist, an error is returned.
+   /// If the process whitelist is empty,
+   /// this check is ignored.
    ///
    /// <h2   id=note_environment_start_main_result_static>
    /// <a href=#note_environment_start_main_result_static>
@@ -373,7 +377,8 @@ impl Environment {
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
    pub fn __start_main_void<F>(
-      entrypoint  : F,
+      entrypoint        : F,
+      process_whitelist : &[&str],
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce(),
    {
@@ -388,6 +393,10 @@ impl Environment {
    /// and executes an entrypoint with a
    /// Result&lt;(), E&gt; return type where E
    /// implements std::error::Error statically.
+   /// If the process name does not match any
+   /// of those in process whitelist, an error
+   /// is returned. If the process whitelist is
+   /// empty, this check is ignored.
    ///
    /// <h2   id=note_environment_start_main_result_static>
    /// <a href=#note_environment_start_main_result_static>
@@ -397,7 +406,8 @@ impl Environment {
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
    pub fn __start_main_result_static<F, E>(
-      entrypoint  : F,
+      entrypoint        : F,
+      process_whitelist : &[&str],
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), E>,
          E: std::error::Error,
@@ -412,8 +422,12 @@ impl Environment {
    /// Initializes the thread environment
    /// and executes an entrypoint with a
    /// Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;
-   /// return type.
-   /// 
+   /// return type. If the process name
+   /// does not match any of those in
+   /// process whitelist, an error is
+   /// returned. If the process whitelist
+   /// is empty, this check is ignored.
+   ///
    /// <h2   id=note_environment_start_main_result_static>
    /// <a href=#note_environment_start_main_result_static>
    /// Note
@@ -422,7 +436,8 @@ impl Environment {
    /// Instead use the nusion::entry attribute macro
    /// to register a function as the designated entrypoint.
    pub fn __start_main_result_dynamic<F>(
-      entrypoint  : F,
+      entrypoint        : F,
+      process_whitelist : &[&str],
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
    {

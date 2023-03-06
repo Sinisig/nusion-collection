@@ -36,25 +36,28 @@ macro_rules! try_env_mut {
 /// Use the entry attribute macro instead!
 #[macro_export]
 macro_rules! __build_entry {
-   ($entry:ident, void)             => {
+   ($entry:ident, void,             $($proc:literal),*)   => {
       $crate::macros::__sys_build_entry!(
          $crate::environment::Environment::__start_main_void,
          $entry,
-         $crate::__osapi
+         $crate::__osapi,
+         $($proc),*
       );
    };
-   ($entry:ident, result_static)    => {
+   ($entry:ident, result_static,    $($proc:literal),*)   => {
       $crate::macros::__sys_build_entry!(
          $crate::environment::Environment::__start_main_result_static,
          $entry,
-         $crate::__osapi
+         $crate::__osapi,
+         $($proc),*
       );
    };
-   ($entry:ident, result_dynamic)   => {
+   ($entry:ident, result_dynamic,   $($proc:literal),*)   => {
       $crate::macros::__sys_build_entry!(
          $crate::environment::Environment::__start_main_result_dynamic,
          $entry,
-         $crate::__osapi
+         $crate::__osapi,
+         $($proc),*
       );
    };
 }

@@ -8,7 +8,7 @@
 // double underscores.
 #[macro_export]
 macro_rules! build_entry {
-   ($starter:path, $entry:ident, $osapi:path)  => {
+   ($starter:path, $entry:ident, $osapi:path, $($proc:literal),*)  => {
       // Re-export because of weird issues expanding in-place
       use $osapi as __nusion_osapi;
 
@@ -53,7 +53,7 @@ macro_rules! build_entry {
          dll_module : __nusion_osapi::shared::minwindef::LPVOID,
       ) -> __nusion_osapi::shared::minwindef::DWORD {
          // Execute main, double deref to get raw i32
-         let return_code = **$starter($entry);
+         let return_code = **$starter($entry, &[$($proc),*]);
 
          // Attempt to unload the library
          unsafe{__nusion_osapi::um::libloaderapi::FreeLibraryAndExitThread(
