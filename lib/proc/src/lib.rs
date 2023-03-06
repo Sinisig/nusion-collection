@@ -19,12 +19,42 @@ mod pm_asm_bytes;
 //////////////////////////////////
 
 /// Builds a shared library entrypoint
-/// using the attached function item.
-/// The function signature should be
-/// the same as main's signature.
-/// This should only ever be used on
-/// a single function inside a dynamic
-/// library crate.
+/// using the attached function.
+/// 
+/// <h2 id=  main_syntax>
+/// <a href=#main_syntax>
+/// Syntax
+/// </a></h2>
+/// The macro should only be attached to
+/// a single function which takes the form
+/// of a binary crate's <code>main()</code>.
+/// The following are valid forms:
+/// <ul>
+/// <li><code>
+/// fn main()
+/// </code></li>
+/// <li>
+/// <code>
+/// fn main() -> Result&lt;(), E&gt;
+/// </code>
+/// where <code>E</code> is some
+/// type which implements the trait
+/// <code>std::error::Error</code>.
+/// </li>
+/// <li><code>
+/// fn main() -> Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;
+/// </code></li>
+/// </ul>
+///
+/// The attribute input for the macro
+/// may also take a list of process names
+/// which are allowed to be attached to.
+/// If the library is loaded into a process
+/// which doesn't match the name of any
+/// process in this list, it will exit
+/// before executing the main function.
+/// This process name list is a comma-separated
+/// list of string literals.
 #[proc_macro_attribute]
 #[proc_macro_error::proc_macro_error]
 pub fn main(

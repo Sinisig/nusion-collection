@@ -4,16 +4,13 @@ pub fn main(
    attr  : proc_macro::TokenStream,
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-   // attr should not contain anything
-   if attr.is_empty() == false {
-      proc_macro_error::emit_call_site_error!(
-         "macro attributes should be empty"
-      );
-      return item;
-   }
-
    // Parse attached item into entrypoint info
    let info = syn::parse_macro_input!(item as EntrypointInfo);
+
+   // Parse the process filter list
+   let allow_list = syn::parse_macro_input!(
+      attr as EntrypointProcessAllowList
+   ).list;
 
    // Miscellaneous variables used to construct
    // the code for main.
@@ -395,6 +392,36 @@ impl syn::parse::Parse for EntrypointInfo {
       return Ok(Self{
          func     : func,
          variant  : EntrypointReturnType::Dynamic,
+      });
+   }
+}
+
+struct EntrypointProcessAllowList {
+   list  : Vec<syn::LitStr>,
+}
+
+impl syn::parse::Parse for EntrypointProcessAllowList {
+   fn parse(
+      input : syn::parse::ParseStream<'_>,
+   ) -> syn::parse::Result<Self> {
+      let mut output = Vec::new();
+
+      while input.is_empty() == false {
+         // Required - String literal for the process name
+         let proc = input.parse::<syn::LitStr>()?;
+
+         // Required if not last element - comma separator
+         if let Err(e) = input.parse::<syn::Token![,]>() {
+            if input.is_empty() == false {
+               return Err(e);
+            }
+         } 
+
+         output.push(proc);
+      }
+
+      return Ok(Self{
+         list : output
       });
    }
 }

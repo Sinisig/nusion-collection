@@ -386,7 +386,7 @@ impl Environment {
 
    /// Initializes the thread environment
    /// and executes an entrypoint with a
-   /// Result\<(), E\> return type where E
+   /// Result&lt;(), E&gt; return type where E
    /// implements std::error::Error statically.
    ///
    /// <h2   id=note_environment_start_main_result_static>
@@ -411,7 +411,7 @@ impl Environment {
 
    /// Initializes the thread environment
    /// and executes an entrypoint with a
-   /// Result\<(), Box<dyn std::error::Error\>
+   /// Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;
    /// return type.
    /// 
    /// <h2   id=note_environment_start_main_result_static>
