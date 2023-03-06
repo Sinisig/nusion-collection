@@ -35,6 +35,9 @@ pub fn asm_bytes(
          // Use the same module trick from
          // hook!() to define the ASM
          mod #module_ident {
+            // Import items from environment
+            use super::*;
+
             // Assembly bytes code gen
             core::arch::global_asm!(#asm_template);
 

@@ -44,6 +44,9 @@ pub fn hook(
          // to fudge our way around issues with
          // global_asm!() being used in a statement
          mod #module_ident {
+            // Import items from environment
+            use super::*;
+
             // Assembly trampoline code gen
             core::arch::global_asm!(#asm_template);
    
