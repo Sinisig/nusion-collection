@@ -3,7 +3,7 @@ macro_rules! game {
       nusion::env_mut!()
          .modules_mut()
          .find_mut_by_executable_file_name("FSD-Win64-Shipping.exe")
-         .unwrap()   // Should always be present because of main macro
+         .unwrap()   // Should always be present because of main attribute
    }
 }
 

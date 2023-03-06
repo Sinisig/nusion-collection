@@ -329,6 +329,46 @@ macro_rules! free_environment {
    };
 }
 
+/// Checks the given process whitelist
+/// and makes sure the process name is
+/// contained within the whitelist assuming
+/// a non-empty whitelist.
+macro_rules! check_whitelist {
+   ($whitelist:ident) => {
+      // Make sure there's items
+      if $whitelist.is_empty() == false {
+         // Get the process name
+         let proc = match crate::process::ProcessSnapshot::local() {
+            Ok(proc) => proc,
+            Err(e)   => {
+               eprintln!("Error: Failed to obtain local process: {e}");
+
+               #[cfg(debug_assertions)]
+               std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
+
+               free_environment!();
+               return crate::sys::environment::OSReturn::FAILURE;
+            },
+         };
+         let proc = &proc.executable_file_name();
+
+         // Find the process name in the list,
+         // erroring if not found
+         if $whitelist.iter().find(|cur| {
+            cur.eq(&proc)
+         }).is_none() == true {
+            eprintln!("Error: Entrypoint does not allow binding to \"{proc}\"");
+
+            #[cfg(debug_assertions)]
+            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
+
+            free_environment!();
+            return crate::sys::environment::OSReturn::FAILURE;
+         }
+      }
+   }
+}
+
 /// Executes a main-like function
 /// which has no return type.
 macro_rules! execute_main_void {
@@ -383,6 +423,7 @@ impl Environment {
    where F: FnOnce(),
    {
       init_environment!();
+      check_whitelist!(process_whitelist);
       execute_main_void!(entrypoint);
       free_environment!();
 
@@ -413,6 +454,7 @@ impl Environment {
          E: std::error::Error,
    {
       init_environment!();
+      check_whitelist!(process_whitelist);
       execute_main_result!(entrypoint);
       free_environment!();
 
@@ -442,6 +484,7 @@ impl Environment {
    where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
    {
       init_environment!();
+      check_whitelist!(process_whitelist);
       execute_main_result!(entrypoint);
       free_environment!();
 
