@@ -46,52 +46,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
       fill = std::mem::size_of::<usize>() * 2 + 2,
    );
 
-   let _test_patcher = nusion::patch::method::Nop{
-      memory_offset_range  : 0x14D7CF0..0x14D7CF6,
-      checksum             : nusion::patch::Checksum::from(0xF0EF21E8),
+   const TEST_PATCHER : nusion::patch::method::Asm = nusion::patch::method::Asm{
+      memory_offset_range  : 0x14D7CDB..0x14D7CF9,
+      checksum             : nusion::patch::Checksum::from(0x8CC8AE3B),
+      alignment            : nusion::patch::Alignment::Center,
+      asm_bytes            : &[0x31, 0xC0],
    };
 
    use nusion::patch::Patch;
-   let _test_hook_ammo = unsafe{game!()?.patch_create(&TEST_HOOK_AMMO)}?;
+   let _test_hook_ammo = unsafe{game!()?.patch_create(&TEST_PATCHER)}?;
 
    std::thread::sleep(std::time::Duration::from_secs(30));
    return Ok(());
 }
-
-const TEST_HOOK_AMMO : nusion::patch::method::Hook = nusion::patch::method::Hook{
-   memory_offset_range  : 0x14D7CDB..0x14D7CF9,
-   checksum             : nusion::patch::Checksum::from(0x8CC8AE3B),
-   target_hook          : nusion::hook!(
-      "
-      // Stolen bytes
-      sub      eax,[rcx+0x630]
-      xor      ebp,ebp
-      test     eax,eax
-      mov      [rsp+0xC0],r12 // +0x08 because of call
-      cmovle   eax,ebp
-      mov      [rcx+0x648],eax
-
-      // Align stack and store volatiles
-      push     rcx
-
-      // Call the ammo hook
-      lea      rcx,[rcx+0x648]
-      call     {target}
-
-      // Restore volatiles and stack
-      pop      rcx
-      mov      rax,[rcx]
-
-      // Gracefully return
-      ret
-      ",
-      |ammo : & mut i32| {
-         // Add two to counteract the ammo decrement
-         *ammo += 2;
-
-         println!("Received ammo hook! New ammo value: {ammo}");
-         return;
-      },
-   ),
-};
 

@@ -160,6 +160,23 @@ pub mod method {
       pub checksum            : Checksum,
       pub target_hook         : unsafe extern "C" fn(),
    }
+
+   /// Copies a byte buffer containing
+   /// assembly instructions into the
+   /// memory offset range according
+   /// to the alignment.  Any unfilled
+   /// bytes are overwritten with
+   /// architecture-dependent no-operation
+   /// (nop) instructions.  It is recommended
+   /// to use the asm_bytes!() macro to
+   /// generate the byte slice.
+   #[derive(Debug)]
+   pub struct Asm {
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
+      pub asm_bytes           : &'static [u8],
+   }
 }
 
 ///////////////////////
@@ -940,6 +957,58 @@ impl Patcher for method::Hook {
          memory_buffer,
          self.target_hook,
       )}?;
+      return Ok(());
+   }
+}
+
+/////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - method::Asm //
+/////////////////////////////////////////
+
+impl Patcher for method::Asm {
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn checksum(
+      & self,
+   ) -> Checksum {
+      return self.checksum.clone();
+   }  
+
+   fn build_patch(
+      & self,
+      memory_buffer : & mut [u8],
+   ) -> Result<()> {
+      // Verify the ASM will fit into the buffer
+      if memory_buffer.len() < self.asm_bytes.len() {
+         return Err(PatchError::LengthMismatch{
+            found    : self.asm_bytes.len(),
+            expected : memory_buffer.len(),
+         });
+      }
+
+      // Byte padding count
+      let padding_bytes_left = self.alignment.padding_count::<u8>(
+         memory_buffer.len(),
+         self.asm_bytes.len(),
+      )?.0;
+
+      // Copy the ASM bytes
+      memory_buffer[
+         padding_bytes_left..padding_bytes_left+self.asm_bytes.len()
+      ].copy_from_slice(self.asm_bytes);
+
+      // Build the padding instructions
+      crate::sys::compiler::nop_fill(& mut memory_buffer[
+         ..padding_bytes_left
+      ])?;
+      crate::sys::compiler::nop_fill(& mut memory_buffer[
+         padding_bytes_left+self.asm_bytes.len()..
+      ])?;
+
       return Ok(());
    }
 }
