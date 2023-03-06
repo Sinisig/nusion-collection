@@ -12,6 +12,7 @@
 
 mod pm_main;
 mod pm_hook;
+mod pm_asm_bytes;
 
 //////////////////////////////////
 // PROCEDURAL MACRO DEFINITIONS //
@@ -153,5 +154,57 @@ pub fn hook(
    item  : proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
    return pm_hook::hook(item);
+}
+
+/// Generates a static byte slice
+/// containing assembly instructions.
+/// The syntax is mostly the same
+/// as <code><a href=
+/// https://doc.rust-lang.org/stable/core/arch/macro.asm.html
+/// >asm!()</a></code>, but there
+/// are no options nor template arguments.
+/// 
+/// <h2 id=  asm_bytes_note>
+/// <a href=#asm_bytes_note>
+/// Note
+/// </a></h2>
+///
+/// Due to the const version of certain
+/// slice manipulating functions being
+/// added in later versions of the standard
+/// library, this macro may only be used
+/// to initialize a constant variable when
+/// using version 1.64 or greater of the
+/// standard library.  Using an earlier
+/// version will result in a compile error.
+///
+/// <h2 id=  asm_bytes_safety>
+/// <a href=#asm_bytes_safety>
+/// Safety
+/// </a></h2>
+///
+/// The input assembly should not only
+/// be valid for its intended use case,
+/// but should also <b>never</b> use any
+/// memory-relative offsets.  Since the raw
+/// machine code is stored as a byte slice
+/// and then copiped when applied through
+/// a patch, memory-relative offsets will
+/// remain the same.  <i>This will lead
+/// to the formerly valid offsets pointing
+/// to now unknown junk data</i>.  The only
+/// memory-relative offsets which are valid
+/// are ones relative to the instruction
+/// pointer / program counter register and
+/// are contained within the provided assembly.
+/// Any references to code or data outside
+/// the provided assembly will lead to undefined
+/// behavior.
+#[proc_macro]
+#[proc_macro_error::proc_macro_error]
+pub fn asm_bytes(
+   item  : proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+   return pm_asm_bytes::asm_bytes(item);
 }
 
