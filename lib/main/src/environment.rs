@@ -162,13 +162,85 @@ impl Environment {
       // Register our panic hook before all
       // else so we get proper panic behavior
       // if any of the below panics.
-      std::panic::set_hook(Box::new(|info| {
-         let message = info.payload().downcast_ref::<&str>().unwrap_or(
-            &"(unable to format panic payload)",
-         );
-         
-         eprintln!("Nusion panicked! {message:?}");
+      std::panic::set_hook(Box::new(|panic_info| {
+         const ERROR_LOG_FILE_NAME  : &'static str
+            = "nusion-panic-log";
+         const ERROR_LOG_FILE_EXT   : &'static str
+            = "txt";
 
+         let mut err_buffer = String::new();
+
+         err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+         err_buffer += "!!!       NUSION PANICKED       !!!\n";
+         err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
+
+         // Format the location in the source code
+         if let Some(location) = panic_info.location() {
+            let file = location.file();
+            let line = location.line();
+            let colm = location.column();
+
+            err_buffer += &format!(
+               "Panicked in {file} at {line},{colm}: "
+            );
+         } else {
+            err_buffer += "(source file information unavaliable): ";
+         }
+
+         // Format the attached payload message
+         if let Some(msg) = panic_info.payload().downcast_ref::<&str>() {
+            err_buffer += &format!("{msg}\n\n");
+         } else {
+            err_buffer += "(unable to format error message)\n\n";
+         }
+
+         // Format down the entire known call stack
+         err_buffer += "----------- Call stack ------------\n";
+         err_buffer += "TODO: Implement this\n";
+         err_buffer += "-----------------------------------\n\n";
+
+         // Get the current working directory to
+         // start enumerating the full file path
+         // for the error log.  This is done instead
+         // of using a relative path because since
+         // we may be panicking from the injected
+         // process, it will output the error log
+         // to the game's executable folder, not
+         // the injected library's folder.  This
+         // can lead to lots of confusion.
+         let mut err_log_path = std::env::current_dir().unwrap_or(
+            std::path::PathBuf::new(),
+         );
+
+         // Append file name, time, and extension
+         err_log_path.push(std::path::Path::new(
+            ERROR_LOG_FILE_NAME,
+         ));
+         err_log_path.push(std::path::Path::new(&format!(
+            "",  
+         )));
+         err_log_path.push(std::path::Path::new(&format!(
+            ".{ERROR_LOG_FILE_EXT}",
+         )));
+
+         // Write the output error log path, but don't
+         // actually write the file yet
+         err_buffer += &format!(
+            "Writing error log to \"{}\"...\n",
+            err_log_path.to_str().unwrap_or("(invalid text)"),
+         );
+
+         // Display the error message
+         eprint!("{err_buffer}");
+
+         // Attempt to write the error log
+         std::fs::write(&err_log_path, &err_buffer).unwrap_or_else(|e| {
+            eprintln!("Failed to write the error log! {e}");
+            eprintln!("Grumble...grumble...");
+         });
+
+         // Sleep in debug builds to give time to
+         // analyze the panic
          debug_sleep!();
       }));
 
