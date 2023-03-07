@@ -281,10 +281,17 @@ impl Environment {
 // MAIN EXECUTORS - Environment //
 //////////////////////////////////
 
-#[cfg(debug_assertions)]
-const DEBUG_SLEEP_ON_ERROR_DURATION
-   : std::time::Duration
-   = std::time::Duration::from_secs(5);
+/// Blocks the thread for a duration
+/// of time in debug builds to give
+/// the programmer time to react to
+/// error messages.  This does nothing
+/// in release builds.
+macro_rules! debug_sleep {
+   () => {
+      #[cfg(debug_assertions)]
+      std::thread::sleep(std::time::Duration::from_secs(10));
+   }
+}
 
 /// Creates a new environment and
 /// initializes the global context
@@ -297,11 +304,8 @@ macro_rules! init_environment {
       match Environment::new() {
          Ok(env)  => unsafe{env.global_state_init()},
          Err(e)   => {
-            eprintln!("Error: Failed to initialize environment: {e}");
-
-            #[cfg(debug_assertions)]
-            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
-
+            eprintln!   ("Error: Failed to initialize environment: {e}");
+            debug_sleep!();
             return crate::sys::environment::OSReturn::FAILURE;
          },
       }
@@ -318,11 +322,8 @@ macro_rules! free_environment {
       match unsafe{Environment::global_state_free()} {
          Ok(_)    => (),
          Err(e)   => {
-            eprintln!("Error: Failed to free environment: {e}");
-
-            #[cfg(debug_assertions)]
-            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
-
+            eprintln!   ("Error: Failed to free environment: {e}");
+            debug_sleep!();
             return crate::sys::environment::OSReturn::FAILURE;
          },
       }
@@ -341,12 +342,9 @@ macro_rules! check_whitelist {
          let proc = match crate::process::ProcessSnapshot::local() {
             Ok(proc) => proc,
             Err(e)   => {
-               eprintln!("Error: Failed to obtain local process: {e}");
-
-               #[cfg(debug_assertions)]
-               std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
-
-               free_environment!();
+               eprintln!         ("Error: Failed to obtain local process: {e}");
+               debug_sleep!      ();
+               free_environment! ();
                return crate::sys::environment::OSReturn::FAILURE;
             },
          };
@@ -357,12 +355,9 @@ macro_rules! check_whitelist {
          if $whitelist.iter().find(|cur| {
             cur.eq(&proc)
          }).is_none() == true {
-            eprintln!("Error: Entrypoint does not allow binding to \"{proc}\"");
-
-            #[cfg(debug_assertions)]
-            std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
-
-            free_environment!();
+            eprintln!         ("Error: Entrypoint does not allow binding to \"{proc}\"");
+            debug_sleep!      ();
+            free_environment! ();
             return crate::sys::environment::OSReturn::FAILURE;
          }
       }
@@ -389,12 +384,9 @@ macro_rules! execute_main_void {
 macro_rules! execute_main_result {
    ($identifier:ident) => {
       if let Err(err) = $identifier() {
-         eprintln!("Error: {err}");
-         
-         #[cfg(debug_assertions)]
-         std::thread::sleep(DEBUG_SLEEP_ON_ERROR_DURATION);
-
-         free_environment!();
+         eprintln!         ("Error: {err}");
+         debug_sleep!      ();
+         free_environment! ();
          return crate::sys::environment::OSReturn::FAILURE;
       }
    };

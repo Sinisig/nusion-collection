@@ -95,7 +95,7 @@ dependencies = [
 
 [[package]]
 name = "nusion"
-version = "0.3.2+alpha"
+version = "0.3.3+alpha"
 dependencies = [
  "crc",
  "lazy_static",
@@ -113,7 +113,7 @@ dependencies = [
 
 [[package]]
 name = "nusion-proc-macros"
-version = "0.3.2+alpha"
+version = "0.3.3+alpha"
 dependencies = [
  "hashers",
  "lazy_static",
@@ -127,7 +127,7 @@ dependencies = [
 
 [[package]]
 name = "nusion-sys"
-version = "0.3.2+alpha"
+version = "0.3.3+alpha"
 dependencies = [
  "winapi",
 ]
