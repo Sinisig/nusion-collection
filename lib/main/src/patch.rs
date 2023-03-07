@@ -77,7 +77,23 @@ pub struct Checksum {
 /// struct which implement the
 /// patch::Reader trait.
 pub mod reader {
-   
+   /// Reads a single item which
+   /// implements the Copy trait.
+   #[derive(Debug)]
+   pub struct Item<T: Copy> {
+      pub marker              : std::marker::PhantomData<* const T>,
+      pub memory_offset_range : std::ops::Range<usize>,
+   }
+
+   /// Reads a slice of items
+   /// which implement the Copy
+   /// trait.
+   #[derive(Debug)]
+   pub struct Slice<T: Copy> {
+      pub marker              : std::marker::PhantomData<* const T>,
+      pub memory_offset_range : std::ops::Range<usize>,
+      pub element_count       : usize,
+   }
 }
 
 /// Collection of provided patching
@@ -304,6 +320,8 @@ pub trait Patch {
 /// This is the trait which reads bytes
 /// from memory.
 pub trait Reader {
+   /// The item type which is returned
+   /// by <code>read_item()</code>.
    type Item;
 
    /// Returns the stored memory offset
@@ -681,6 +699,94 @@ impl std::fmt::Display for Checksum {
          "{}",
          self.checksum,
       );
+   }
+}
+
+//////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - reader::Item //
+//////////////////////////////////////////
+
+impl<T: Copy> Reader for reader::Item<T> {
+   type Item = T;
+
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn read_item(
+      & self,
+      memory_buffer  : & [u8],
+   ) -> Result<Self::Item> {
+      let item_size = std::mem::size_of::<T>();
+
+      if memory_buffer.len() != item_size {
+         return Err(PatchError::LengthMismatch{
+            found    : memory_buffer.len(),
+            expected : item_size,
+         })
+      }
+
+      // This looks sketchy, but since we have
+      // the Copy trait bound and checked the
+      // length with the above code, this will
+      // always be valid given the memory buffer
+      // is also valid.
+      let item_ptr   = memory_buffer.as_ptr() as * const T;
+      let item       = unsafe{*item_ptr};
+
+      return Ok(item);
+   }
+}
+
+///////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - reader::Slice //
+///////////////////////////////////////////
+
+impl<T: Copy> Reader for reader::Slice<T> {
+   type Item = Vec<T>;
+
+   fn memory_offset_range(
+      & self,
+   ) -> std::ops::Range<usize> {
+      return self.memory_offset_range.clone();
+   }
+
+   fn read_item(
+      & self,
+      memory_buffer  : & [u8],
+   ) -> Result<Self::Item> {
+      let item_size  = std::mem::size_of::<T>();
+      let byte_count = self.element_count * item_size;
+
+      if memory_buffer.len() < byte_count {
+         return Err(PatchError::LengthMismatch{
+            found    : memory_buffer.len(),
+            expected : byte_count,
+         });
+      }
+
+      if item_size == 0 {
+         return Ok(Vec::new());
+      }
+
+      let bytes_residual = memory_buffer.len() % item_size;
+      if bytes_residual != 0 {
+         return Err(PatchError::ResidualBytes{
+            residual : bytes_residual,
+         });
+      }
+
+      // Again, looks sketchy but the above code
+      // verifies this is sound
+      let item_slice = unsafe{std::slice::from_raw_parts(
+         memory_buffer.as_ptr() as * const T,
+         self.element_count,
+      )};
+      let item_vec   = item_slice.to_vec();
+
+      return Ok(item_vec);
    }
 }
 
