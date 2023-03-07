@@ -1,10 +1,5 @@
      --- Before leaving alpha phase ---
 
- * Add a custom panic hook to environent
-   which sleeps in debug modes and prints
-   nothing in release modes. Maybe also
-   write an error log out to a file?
-
  * Maybe look at abstracting all "private-public"
    items inside a module named "__private", and
    then remove all leading underscores from items

@@ -9,5 +9,6 @@ edition     = "2021"
 nusion-proc-macros   = { path = "../proc" }
 nusion-sys           = { path = "../sys"  }
 lazy_static          = "1.4.0"
+backtrace            = "0.3.67"
 crc                  = "3.0.1"
 
