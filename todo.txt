@@ -1,0 +1,53 @@
+     --- Before leaving alpha phase ---
+
+ * Add a custom panic hook to environent
+   which sleeps in debug modes and prints
+   nothing in release modes. Maybe also
+   write an error log out to a file?
+
+ * Maybe look at abstracting all "private-public"
+   items inside a module named "__private", and
+   then remove all leading underscores from items
+   within this module
+
+ * Perform a general code review.  There
+   is a lot of unsafe{} in here!  Especially
+   the OS abstractions...those are the worst
+   offenders.  I would be VERY suprised if
+   there isn't at least one memory safety
+   bug or stupid mistake causing UB.
+
+ * Proper massaging of OS error codes into
+   Rust error enums.  Currently, no actual
+   errors are returned, only "Unknown"
+   variants
+
+ * Add support for at least 32-bit x86 and
+   Linux (64 and 32 bit) in the sys crate.
+   We don't want to restrict ourselves to
+   only 64-bit Windows.  We're better than that!
+
+ * Clean up process file to use hashmaps which
+   reference strings contained inside a vector.
+   This will partially solve the issue of
+   referencing data moved inside the hash map
+   so we can return string slices instead of
+   making String copies (slow and bad)
+
+ * Documentation! Clean up, review, and improve
+   existing documentation and add new documentation.
+   Most importantly, we need examples! Create sample
+   code in the nusion crate root (lib.rs) showing
+   how to define an entrypoint in a shared library
+   and patch code.
+
+ * Rename nusion crate to nusion-lib.  The term
+   "nusion" should be a general adjective which
+   is used for any project relating to the nusion
+   collection.  For example, "nusion-lib" is the
+   backend game hacking crate.  "nusion-game-drg"
+   is a game hack for Deep Rock Galactic which is
+   tied to this project.  "nusion-loader" will be
+   a shared library loader/injector which is a
+   part of this project.
+
