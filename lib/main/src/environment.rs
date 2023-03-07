@@ -414,10 +414,10 @@ impl Environment {
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce(),
    {
-      init_environment!();
-      check_whitelist!(process_whitelist);
+      init_environment! ();
+      check_whitelist!  (process_whitelist);
       execute_main_void!(entrypoint);
-      free_environment!();
+      free_environment! ();
 
       return crate::sys::environment::OSReturn::SUCCESS;
    }
@@ -445,10 +445,10 @@ impl Environment {
    where F: FnOnce() -> std::result::Result<(), E>,
          E: std::error::Error,
    {
-      init_environment!();
-      check_whitelist!(process_whitelist);
-      execute_main_result!(entrypoint);
-      free_environment!();
+      init_environment!    ();
+      check_whitelist!     (process_whitelist);
+      execute_main_result! (entrypoint);
+      free_environment!    ();
 
       return crate::sys::environment::OSReturn::SUCCESS;
    }
@@ -475,10 +475,10 @@ impl Environment {
    ) -> crate::sys::environment::OSReturn
    where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
    {
-      init_environment!();
-      check_whitelist!(process_whitelist);
-      execute_main_result!(entrypoint);
-      free_environment!();
+      init_environment!    ();
+      check_whitelist!     (process_whitelist);
+      execute_main_result! (entrypoint);
+      free_environment!    ();
 
       return crate::sys::environment::OSReturn::SUCCESS;
    }
