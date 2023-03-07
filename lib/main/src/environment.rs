@@ -3,6 +3,22 @@
 
 use std::sync::{Mutex, MutexGuard};
 
+//////////////////
+// DEBUG MACROS //
+//////////////////
+
+/// Blocks the thread for a duration
+/// of time in debug builds to give
+/// the programmer time to react to
+/// error messages.  This does nothing
+/// in release builds.
+macro_rules! debug_sleep {
+   () => {
+      #[cfg(debug_assertions)]
+      std::thread::sleep(std::time::Duration::from_secs(10));
+   }
+}
+
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
@@ -94,7 +110,7 @@ lazy_static::lazy_static!{
 static ref ENVIRONMENT_GLOBAL_STATE_GUARD
    : Mutex<&'static mut Environment>
    = Mutex::new(unsafe{ENVIRONMENT_GLOBAL_STATE.as_mut().expect(
-      "Accessed environment before initialization, this is a programming bug",
+      "Accessed environment before initialization, this is a bug",
    )});
 }
 
@@ -143,6 +159,19 @@ impl Environment {
    /// Creates a new instance of an
    /// environment
    fn new() -> Result<Self> {
+      // Register our panic hook before all
+      // else so we get proper panic behavior
+      // if any of the below panics.
+      std::panic::set_hook(Box::new(|info| {
+         let message = info.payload().downcast_ref::<&str>().unwrap_or(
+            &"(unable to format panic payload)",
+         );
+         
+         eprintln!("Nusion panicked! {message:?}");
+
+         debug_sleep!();
+      }));
+
       let console = crate::console::Console::new()?;
 
       let process = crate::process::ProcessSnapshot::local()?;
@@ -159,139 +188,22 @@ impl Environment {
    }
 }
 
-///////////////////////////
-// METHODS - Environment //
-///////////////////////////
+/////////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - Environment //
+/////////////////////////////////////////
 
-impl Environment {
-   /// Gets a handle to the program's
-   /// environment.
-   ///
-   /// <h2 id=  environment_get_panics>
-   /// <a href=#environment_get_panics>
-   /// Panics
-   /// </a></h2>
-   ///
-   /// If the function is unable to access
-   /// the environment, the program will
-   /// panic.  For a non-panicking version,
-   /// use Environment::try_get().
-   pub fn get<'l>(
-   ) -> MutexGuard<'l, &'static Self> {
-      return Self::try_get().expect(
-         "Failed to access environment",
-      );
-   }
-
-   /// Gets a mutable handle to the
-   /// program's environment.
-   ///
-   /// <h2 id=  environment_get_mut_panics>
-   /// <a href=#environment_get_mut_panics>
-   /// Panics
-   /// </a></h2>
-   ///
-   /// If the function is unable to access
-   /// the environment, the program will
-   /// panic.  For a non-panicking version,
-   /// use Environment::try_get_mut().
-   pub fn get_mut<'l>(
-   ) -> MutexGuard<'l, &'static mut Self> {
-      return Self::try_get_mut().expect(
-         "Failed to access mutable environment",
-      );
-   }
-
-   /// Tries to get a handle to the
-   /// program's environment, returning
-   /// an error upon failure.
-   pub fn try_get<'l>(
-   ) -> Result<MutexGuard<'l, &'static Self>> {
-      return Self::global_state_ref();
-   }
-
-   /// Tries to get a mutable handle to
-   /// the program's environment, returning
-   /// an error upon failure.
-   pub fn try_get_mut<'l>(
-   ) -> Result<MutexGuard<'l, &'static mut Self>> {
-      return Self::global_state_guard();
-   } 
-
-   /// Gets a reference to the stored
-   /// console.
-   pub fn console<'l>(
-      &'l self,
-   ) -> &'l crate::console::Console {
-      return &self.console;
-   }
-
-   /// Gets a mutable reference to the
-   /// stored console.
-   pub fn console_mut<'l>(
-      &'l mut self,
-   ) -> &'l mut crate::console::Console {
-      return & mut self.console;
-   }
-
-   /// Gets a reference to the current
-   /// process information.
-   pub fn process<'l>(
-      &'l self,
-   ) -> &'l crate::process::ProcessSnapshot {
-      return &self.process;
-   }
-
-   /// Gets a reference to the stored
-   /// module list for the process.
-   pub fn modules<'l>(
-      &'l self,
-   ) -> &'l crate::process::ModuleSnapshotList {
-      return &self.modules;
-   }
-
-   /// Gets a mutable reference to the
-   /// stored module list for the process.
-   pub fn modules_mut<'l>(
-      &'l mut self,
-   ) -> &'l mut crate::process::ModuleSnapshotList {
-      return & mut self.modules;
-   }
-
-   /// Refreshes the module list for
-   /// the current process in case any
-   /// other modules were loaded or
-   /// unloaded.  For most use cases,
-   /// this function should not be needed
-   /// as processes rarely dynamically load
-   /// or unload modules after initialization.
-   pub fn refresh_modules(
+impl std::ops::Drop for Environment {
+   fn drop(
       & mut self,
-   ) -> Result<& mut Self> {
-      let modules = crate::process::ModuleSnapshotList::all(
-         crate::process::ProcessSnapshot::local()?,
-      )?;
-
-      self.modules = modules;
-      return Ok(self);
+   ) {
+      let _ = std::panic::take_hook();
+      return;
    }
 }
 
 //////////////////////////////////
 // MAIN EXECUTORS - Environment //
 //////////////////////////////////
-
-/// Blocks the thread for a duration
-/// of time in debug builds to give
-/// the programmer time to react to
-/// error messages.  This does nothing
-/// in release builds.
-macro_rules! debug_sleep {
-   () => {
-      #[cfg(debug_assertions)]
-      std::thread::sleep(std::time::Duration::from_secs(10));
-   }
-}
 
 /// Creates a new environment and
 /// initializes the global context
@@ -481,6 +393,124 @@ impl Environment {
       free_environment!    ();
 
       return crate::sys::environment::OSReturn::SUCCESS;
+   }
+}
+
+//////////////////////////////////
+// PUBLIC METHODS - Environment //
+//////////////////////////////////
+
+impl Environment {
+   /// Gets a handle to the program's
+   /// environment.
+   ///
+   /// <h2 id=  environment_get_panics>
+   /// <a href=#environment_get_panics>
+   /// Panics
+   /// </a></h2>
+   ///
+   /// If the function is unable to access
+   /// the environment, the program will
+   /// panic.  For a non-panicking version,
+   /// use Environment::try_get().
+   pub fn get<'l>(
+   ) -> MutexGuard<'l, &'static Self> {
+      return Self::try_get().expect(
+         "Failed to access environment",
+      );
+   }
+
+   /// Gets a mutable handle to the
+   /// program's environment.
+   ///
+   /// <h2 id=  environment_get_mut_panics>
+   /// <a href=#environment_get_mut_panics>
+   /// Panics
+   /// </a></h2>
+   ///
+   /// If the function is unable to access
+   /// the environment, the program will
+   /// panic.  For a non-panicking version,
+   /// use Environment::try_get_mut().
+   pub fn get_mut<'l>(
+   ) -> MutexGuard<'l, &'static mut Self> {
+      return Self::try_get_mut().expect(
+         "Failed to access mutable environment",
+      );
+   }
+
+   /// Tries to get a handle to the
+   /// program's environment, returning
+   /// an error upon failure.
+   pub fn try_get<'l>(
+   ) -> Result<MutexGuard<'l, &'static Self>> {
+      return Self::global_state_ref();
+   }
+
+   /// Tries to get a mutable handle to
+   /// the program's environment, returning
+   /// an error upon failure.
+   pub fn try_get_mut<'l>(
+   ) -> Result<MutexGuard<'l, &'static mut Self>> {
+      return Self::global_state_guard();
+   } 
+
+   /// Gets a reference to the stored
+   /// console.
+   pub fn console<'l>(
+      &'l self,
+   ) -> &'l crate::console::Console {
+      return &self.console;
+   }
+
+   /// Gets a mutable reference to the
+   /// stored console.
+   pub fn console_mut<'l>(
+      &'l mut self,
+   ) -> &'l mut crate::console::Console {
+      return & mut self.console;
+   }
+
+   /// Gets a reference to the current
+   /// process information.
+   pub fn process<'l>(
+      &'l self,
+   ) -> &'l crate::process::ProcessSnapshot {
+      return &self.process;
+   }
+
+   /// Gets a reference to the stored
+   /// module list for the process.
+   pub fn modules<'l>(
+      &'l self,
+   ) -> &'l crate::process::ModuleSnapshotList {
+      return &self.modules;
+   }
+
+   /// Gets a mutable reference to the
+   /// stored module list for the process.
+   pub fn modules_mut<'l>(
+      &'l mut self,
+   ) -> &'l mut crate::process::ModuleSnapshotList {
+      return & mut self.modules;
+   }
+
+   /// Refreshes the module list for
+   /// the current process in case any
+   /// other modules were loaded or
+   /// unloaded.  For most use cases,
+   /// this function should not be needed
+   /// as processes rarely dynamically load
+   /// or unload modules after initialization.
+   pub fn refresh_modules(
+      & mut self,
+   ) -> Result<& mut Self> {
+      let modules = crate::process::ModuleSnapshotList::all(
+         crate::process::ProcessSnapshot::local()?,
+      )?;
+
+      self.modules = modules;
+      return Ok(self);
    }
 }
 
