@@ -15,7 +15,7 @@ use std::sync::{Mutex, MutexGuard};
 macro_rules! debug_sleep {
    () => {
       #[cfg(debug_assertions)]
-      std::thread::sleep(std::time::Duration::from_secs(10));
+      std::thread::sleep(std::time::Duration::from_secs(15));
    }
 }
 
@@ -199,6 +199,14 @@ impl Environment {
          err_buffer += "TODO: Implement this\n";
          err_buffer += "-----------------------------------\n\n";
 
+         // Get the time since the Unix Epoch Time
+         // for creating a time stamp for the error
+         // log file.
+         let unix_epoch_elapsed = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap_or(std::time::Duration::from_secs(0))
+            .as_secs();
+
          // Get the current working directory to
          // start enumerating the full file path
          // for the error log.  This is done instead
@@ -213,15 +221,13 @@ impl Environment {
          );
 
          // Append file name, time, and extension
-         err_log_path.push(std::path::Path::new(
-            ERROR_LOG_FILE_NAME,
+         err_log_path.push(std::path::Path::new("temp.bin"));
+         err_log_path.set_file_name(std::path::Path::new(&format!(
+            "{ERROR_LOG_FILE_NAME}-{unix_epoch_elapsed}",
+         )));
+         err_log_path.set_extension(std::path::Path::new(
+            ERROR_LOG_FILE_EXT,
          ));
-         err_log_path.push(std::path::Path::new(&format!(
-            "",  
-         )));
-         err_log_path.push(std::path::Path::new(&format!(
-            ".{ERROR_LOG_FILE_EXT}",
-         )));
 
          // Write the output error log path, but don't
          // actually write the file yet
