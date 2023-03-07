@@ -20,7 +20,7 @@ static ref LOOP_ERROR
 // Hook information which also writes
 // the returned info from the loop to
 // our globals safely.
-const HOOK_LOOP : nusion::patch::method::Hook = nusion::patch::method::Hook{
+const HOOK_LOOP : nusion::patch::writer::Hook = nusion::patch::writer::Hook{
    memory_offset_range  : 0x8241BC..0x8241CD,
    checksum             : nusion::patch::Checksum::from(0xF7946268),
    target_hook          : nusion::hook!("
