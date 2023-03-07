@@ -2,7 +2,7 @@
 name        = "nusion"
 description = "General game modding framework and utilites crate."
 authors     = ["Sinisig"]
-version     = "0.3.3+alpha"
+version     = "0.3.4+alpha"
 edition     = "2021"
 
 [dependencies]

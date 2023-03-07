@@ -10,6 +10,7 @@
 /// looping.
 pub fn exec_loop(
 ) -> Result<bool, Box<dyn std::error::Error + Send>> {
-   panic!("The game thread has panicked!  What do we do now?");
+   println!("Executed loop!");
+   return Ok(true);
 }
 
