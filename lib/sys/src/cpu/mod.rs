@@ -7,11 +7,11 @@
    "Unsupported CPU architecture",
 );
 
-// Public modules
+// CPU abstraction modules
 #[cfg(target_arch = "x86_64")]
 pub mod amd64;
 
-// Public re-exports
+// CPU abstraction re-exports
 #[cfg(target_arch = "x86_64")]
 pub use amd64::*;
 

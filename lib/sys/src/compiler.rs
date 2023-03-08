@@ -8,12 +8,18 @@
 pub enum CompilationError {
    ImpossibleEncoding,
    BufferTooSmall{
-      inst_len : usize,
-      buff_len : usize,
+      instruction_length   : usize,
+      buffer_length        : usize,
    },
 }
 
+/// <code>Result</code> type with error
+/// variant <code>CompilationError</code>.
 pub type Result<T> = std::result::Result<T, CompilationError>;
+
+/// Type which stores a pointer to a hook function
+/// for use in <code>hook_fill</code>.
+pub type HookTarget = unsafe extern "C" fn();
 
 //////////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - CompilationError //
@@ -27,8 +33,8 @@ impl std::fmt::Display for CompilationError {
       return match self {
          Self::ImpossibleEncoding
             => write!(stream, "Impossible instruction encoding"),
-         Self::BufferTooSmall {inst_len, buff_len}
-            => write!(stream, "Buffer is too small for instruction encoding: Requires at least {inst_len}, found {buff_len}"),
+         Self::BufferTooSmall {instruction_length, buffer_length}
+            => write!(stream, "Buffer is too small for instruction encoding: Requires at least {instruction_length}, found {buffer_length}"),
       };
    }
 }
@@ -40,35 +46,41 @@ impl std::error::Error for CompilationError {
 // FUNCTIONS //
 ///////////////
 
-/// Fills the given slice with
-/// no-operation instructions.
+/// Fills the given memory buffer
+/// with architecture-dependent
+/// no-operation (NOP) instructions.
 pub fn nop_fill(
-   memory_region  : & mut [u8],
-) -> Result<& mut [u8]> {
-   return crate::cpu::compiler::nop_fill(memory_region);
+   memory_buffer : & mut [u8],
+) -> Result<()> {
+   return crate::cpu::compiler::nop_fill(
+      memory_buffer,
+   );
 }
 
-/// Builds a function hook within
-/// the given slice and fills the
-/// remaining space with no-operation
-/// instructions.
+/// Compiles a call to a function
+/// inside a memory buffer.  The
+/// rest of the buffer is filled
+/// with architecture-dependent
+/// no-operation (NOP) instructions.
 ///
-/// <h2 id=  hook_fill_safety>
-/// <a href=#hook_fill_safety>
-/// Safety
+/// <h2 id=  hook_fill_note>
+/// <a href=#hook_fill_note>
+/// Note
 /// </a></h2>
-///
-/// It is assumed the slice will
-/// never be copied or moved.  This
-/// is because relative memory offsets
-/// are used when assembling the call
-/// instruction.  The compiled code
-/// is only valid for the input slice
-/// and not any copies of it.
-pub unsafe fn hook_fill(
-   memory_region  : & mut [u8],
-   target_hook    : unsafe extern "C" fn(),
-) -> Result<& mut [u8]> {
-   return crate::cpu::compiler::hook_fill(memory_region, target_hook);
+/// The compiled code expects to
+/// never be moved to a new memory
+/// location.  Copying the memory
+/// buffer slice to a new region
+/// will lead to invalid code.
+/// If you want to clone a compiled,
+/// hook, it must be re-compiled
+/// in the new memory buffer.
+pub fn hook_fill(
+   memory_buffer  : & mut [u8],
+   hook           : HookTarget,
+) -> Result<()> {
+   return crate::cpu::compiler::hook_fill(
+      memory_buffer, hook,
+   );
 }
 

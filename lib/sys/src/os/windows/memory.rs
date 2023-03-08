@@ -28,38 +28,26 @@ use winapi::{
    },
 };
 
-//////////////////////
-// TYPE DEFINITIONS //
-//////////////////////
-
-/// Type used for storing memory
-/// permission flags.
-pub struct MemoryPermissions(DWORD);
-
-///////////////////////////////////
-// CONSTANTS - MemoryPermissions //
-///////////////////////////////////
+pub struct MemoryPermissions {
+   permissions : DWORD
+}
 
 impl MemoryPermissions {
    pub const READ                : Self
-      = Self(PAGE_READONLY);
+      = Self{permissions : PAGE_READONLY           };
 
    pub const READ_WRITE          : Self
-      = Self(PAGE_READWRITE);
+      = Self{permissions : PAGE_READWRITE          };
 
    pub const READ_EXECUTE        : Self
-      = Self(PAGE_EXECUTE_READ);
+      = Self{permissions : PAGE_EXECUTE_READ       };
 
    pub const READ_WRITE_EXECUTE  : Self
-      = Self(PAGE_EXECUTE_READWRITE);
+      = Self{permissions : PAGE_EXECUTE_READWRITE  };
 
    pub const ALL : Self
       = Self::READ_WRITE_EXECUTE;
 }
-
-/////////////////////////////////
-// METHODS - MemoryPermissions //
-/////////////////////////////////
 
 impl MemoryPermissions {
    pub fn set(
@@ -75,17 +63,16 @@ impl MemoryPermissions {
       if unsafe{VirtualProtect(
          base  as LPVOID,
          bytes as SIZE_T,
-         permissions.0,
+         permissions.permissions,
          & mut old_permissions,
       )} == TRUE {
-         return Ok(Self(old_permissions));
+         return Ok(Self{permissions : old_permissions});
       }
 
       // Parse error number into MemoryErrorKind
       use crate::memory::MemoryErrorKind::*;
       let errkind = match unsafe{GetLastError()} {
-         // TODO: Error code parsing
-         _           => Unknown,
+         _ => Unknown,
       };
 
       // Create the MemoryError and return

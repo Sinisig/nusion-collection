@@ -24,8 +24,8 @@ pub enum MemoryErrorKind {
    Unknown,
 }
 
-/// Result type returned by falliable
-/// functions.
+/// Result type with error
+/// variant <code>MemoryError</code>
 pub type Result<T> = std::result::Result<T, MemoryError>;
 
 /// Struct for opening up memory for
@@ -33,8 +33,9 @@ pub type Result<T> = std::result::Result<T, MemoryError>;
 /// said memory.  Memory permissions
 /// will be restored automatically
 /// when the struct goes out of scope
-/// via the <a href="https://doc.rust-lang.org/std/ops/trait.Drop.html">Drop</a>
-/// trait.
+/// via the <code><a href=
+/// "https://doc.rust-lang.org/std/ops/trait.Drop.html">Drop
+/// </a></code> trait.
 pub struct MemoryEditor {
    address_range     : std::ops::Range<usize>,
    old_permissions   : crate::os::memory::MemoryPermissions,
@@ -127,6 +128,13 @@ impl MemoryEditor {
       address_range     : std::ops::Range<usize>,
       new_permissions   : crate::os::memory::MemoryPermissions,
    ) -> Result<Self> {
+      if address_range.end < address_range.start {
+         return Err(MemoryError::new(
+            MemoryErrorKind::InvalidAddressRange,
+            address_range,
+         ));
+      }
+
       let old_permissions = crate::os::memory::MemoryPermissions::set(
          &address_range,
          &new_permissions,
@@ -203,94 +211,129 @@ impl MemoryEditor {
    /// Creates a slice type referencing
    /// the data in the stored memory location.
    ///
-   /// <h2 id =  safety_data>
-   /// <a href="#safety_data">
+   /// <h2 id=  memory_editor_as_slice_safety>
+   /// <a href=#memory_editor_as_slice_safety>
    /// Safety
    /// </a></h2>
    /// All safety concerns from
-   /// <a href="https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html">std::slice::from_raw_parts()</a>
+   /// <code><a href=
+   /// "https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html">std::slice::from_raw_parts</a></code>
    /// apply.
    ///
    /// In addition, since the data was created
    /// from raw pointers, the data may change
    /// in unexpected ways and lead to undefined
-   /// behavior.  Also, trying to use a generic
-   /// value which has no size will panic in
-   /// debug builds and lead to undefined behavior
-   /// in release builds.
-   pub unsafe fn data<'l, T>(
+   /// behavior.
+   ///
+   /// <h2 id=  memory_editor_as_slice_panics>
+   /// <a href=#memory_editor_as_slice_panics>
+   /// Panics
+   /// </a></h2>
+   /// If the size of <code>T</code> is zero
+   /// or attempting to create the slice leaves
+   /// residual bytes which cannot be packed
+   /// into <code>T</code>, the thread will
+   /// panic.
+   pub unsafe fn as_slice<'l, T>(
       &'l self,
    ) -> &'l [T] {
       let start      = self.address_range.start;
       let end        = self.address_range.end;
       let byte_count = end - start;
+      let item_size  = std::mem::size_of::<T>();
+
+      if item_size == 0 {
+         panic!("Byte size of item is zero");
+      }
+      if byte_count % item_size != 0 {
+         panic!("Residual bytes after last element");
+      }
 
       return std::slice::from_raw_parts(
          start as * const T,
-         byte_count / std::mem::size_of::<T>(),
+         byte_count / item_size,
       );
    }
 
    /// Creates a mutable slice type referencing
    /// the data in the stored memory location.
    ///
-   /// <h2 id =  safety_data_mut>
-   /// <a href="#safety_data_mut">
+   /// <h2 id=  memory_editor_as_slice_mut_safety>
+   /// <a href=#memory_editor_as_slice_mut_safety>
    /// Safety
    /// </a></h2>
    /// All safety concerns from
-   /// <a href="#safety_data">Self::data()</a>
+   /// <code><a href=
+   /// #memory_editor_as_slice_safety>as_slice</a></code>
    /// apply.
    ///
-   /// In addition, trying to call Self::data_mut()
+   /// In addition, trying to call <code>as_slice_mut</code>
    /// on a MemoryEditor created without write permissions
    /// is undefined behavior and will very likely lead
    /// to a crash when attempting to modify the stored
    /// data.
-   pub unsafe fn data_mut<'l, T>(
+   ///
+   /// <h2 id=  memory_editor_as_slice_mut_panics>
+   /// <a href=#memory_editor_as_slice_mut_panics>
+   /// Panics
+   /// </a></h2>
+   /// This function will panic under the same
+   /// conditions as <code><a href=
+   /// #memory_editor_as_slice_panics>as_slice</a></code>.
+   pub unsafe fn as_slice_mut<'l, T>(
       &'l mut self,
    ) -> &'l mut [T] {
       let start      = self.address_range.start;
       let end        = self.address_range.end;
       let byte_count = end - start;
+      let item_size  = std::mem::size_of::<T>();
+
+      if item_size == 0 {
+         panic!("Byte size of item is zero");
+      }
+      if byte_count % item_size != 0 {
+         panic!("Residual bytes after last element");
+      }
 
       return std::slice::from_raw_parts_mut(
          start as * mut T,
-         byte_count / std::mem::size_of::<T>(),
+         byte_count / item_size,
       );
    }
 
    /// Creates a byte slice type referencing
    /// the bytes in the stored memory location.
    ///
-   /// <h2 id =  safety_bytes>
-   /// <a href="#safety_bytes">
+   /// <h2 id=  memory_editor_as_bytes_safety>
+   /// <a href=#memory_editor_as_bytes_safety>
    /// Safety
    /// </a></h2>
    /// All safety concerns from
-   /// <a href="#safety_data">Self::data()</a>
+   /// <code><a href=
+   /// "#memory_editor_as_slice_safety">MemoryEditor::as_slice</a></code>
    /// apply.
-   pub unsafe fn bytes<'l>(
+   pub unsafe fn as_bytes<'l>(
       &'l self,
    ) -> &'l [u8] {
-      return self.data::<u8>();
+      return self.as_slice::<u8>();
    }
 
    /// Creates a mutable byte slice type
    /// referencing the bytes in the stored
    /// memory location.
    ///
-   /// <h2 id =  safety_bytes_mut>
-   /// <a href="#safety_bytes_mut">
+   /// <h2 id =  memory_editor_as_bytes_mut_safety>
+   /// <a href="#memory_editor_as_bytes_mut_safety">
    /// Safety
    /// </a></h2>
    /// All safety concerns from
-   /// <a href="#safety_data_mut">Self::data_mut()</a>
+   /// <code><a href=
+   /// "#memory_editor_as_slice_mut_safety">MemoryEditor::as_slice_mut</a></code>
    /// apply.
-   pub unsafe fn bytes_mut<'l>(
+   pub unsafe fn as_bytes_mut<'l>(
       &'l mut self,
    ) -> &'l mut [u8] {
-      return self.data_mut::<u8>();
+      return self.as_slice_mut::<u8>();
    }
 }
 

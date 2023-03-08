@@ -1,12 +1,10 @@
 //! crate::os::console implementation for Windows.
 
-use crate::console::{ConsoleError};
 use winapi::{
    shared::{
       minwindef::{
          DWORD,
          FALSE,
-         MAX_PATH,
       },
    },
    um::{
@@ -19,53 +17,68 @@ use winapi::{
          SetConsoleTitleA,
       },
       winnt::{
-         CHAR,
          LPSTR,
+         LPCSTR,
       },
    },
 };
+
+// Maximum allowable title length when
+// set with SetConsoleTitleA.
+const MAX_TITLE_LENGTH : DWORD = 65535;
 
 pub struct Console {
 }
 
 impl Console {
-   pub fn new() -> Result<Self, ConsoleError> {
+   pub fn allocate(
+   ) -> crate::console::Result<Self> {
       if unsafe{AllocConsole()} == FALSE {
-         return Err(ConsoleError::Unknown);
+         return Err(crate::console::ConsoleError::Unknown);
       }
 
-      let mut con = Self{};
-      con.set_title("Nusion Console")?;
+      return Ok(Self{});
+   }
 
-      return Ok(con);
+   pub fn free(
+      & mut self,
+   ) -> crate::console::Result<()> {
+      if unsafe{FreeConsole()} == FALSE {
+         return Err(crate::console::ConsoleError::Unknown);
+      }
+
+      return Ok(());
    }
 
    pub fn get_title(
       & self,
-   ) -> Result<String, ConsoleError> {
-      // MAX_PATH + 1 to read the console title
-      // plus a null terminator and another + 1
-      // to check for errors
-      const READ_BUFFER_LENGTH : usize = MAX_PATH + 2;
+   ) -> crate::console::Result<String> {
+      // Max title length + 1 for a null
+      // terminator
+      const READ_BUFFER_LENGTH : DWORD
+         = MAX_TITLE_LENGTH + 1;
 
-      let mut read_buffer = Vec::<u8>::with_capacity(READ_BUFFER_LENGTH);
-      unsafe{read_buffer.set_len(READ_BUFFER_LENGTH)};
+      // Create our read buffer allocated on
+      // the heap because it's 64 kilobytes
+      let mut read_buffer = Vec::<u8>::with_capacity(READ_BUFFER_LENGTH as usize);
+      unsafe{read_buffer.set_len(READ_BUFFER_LENGTH as usize)};
 
       let character_count = unsafe{GetConsoleTitleA(
          read_buffer.as_mut_ptr() as LPSTR,
-         READ_BUFFER_LENGTH as DWORD,
+         READ_BUFFER_LENGTH,
       )};
 
       if character_count == 0 {
-         // TODO: Propagate error message
-         return Err(ConsoleError::Unknown);
+         return Err(crate::console::ConsoleError::Unknown);
       }
 
       read_buffer.truncate(character_count as usize);
 
       let read_buffer = match String::from_utf8(read_buffer) {
          Ok(s)    => s,
-         Err(_)   => return Err(ConsoleError::InvalidTitleCharacters),
+         Err(_)   => return Err(
+            crate::console::ConsoleError::InvalidTitleCharacters,
+         ),
       };
 
       return Ok(read_buffer);
@@ -73,34 +86,22 @@ impl Console {
 
    pub fn set_title(
       & mut self,
-      title : & str,
-   ) -> Result<& mut Self, ConsoleError> {
-      if title.is_empty() {
-         return Ok(self);
-      }
-
+      new_title : & str,
+   ) -> crate::console::Result<()> {
       // null-terminated C-string
-      let mut title  = String::from(title);
+      let mut title  = String::from(new_title);
       let title      = unsafe{title.as_mut_vec()};
       title.push(0);
 
-      if unsafe{SetConsoleTitleA(title.as_ptr() as * const CHAR)} == FALSE {
-         return Err(ConsoleError::Unknown);
+      if title.len() > MAX_TITLE_LENGTH as usize {
+         return Err(crate::console::ConsoleError::Unknown);
       }
 
-      return Ok(self);
-   }
-}
-
-impl Drop for Console {
-   fn drop(
-      & mut self,
-   ) {
-      if unsafe{FreeConsole()} == FALSE {
-         panic!("Failed to free the console");
+      if unsafe{SetConsoleTitleA(title.as_ptr() as LPCSTR)} == FALSE {
+         return Err(crate::console::ConsoleError::Unknown);
       }
 
-      return;
+      return Ok(());
    }
 }
 

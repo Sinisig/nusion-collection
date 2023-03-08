@@ -1081,10 +1081,10 @@ impl Writer for writer::Hook {
       & self,
       memory_buffer : & mut [u8],
    ) -> Result<()> {
-      unsafe{crate::sys::compiler::hook_fill(
+      crate::sys::compiler::hook_fill(
          memory_buffer,
          self.target_hook,
-      )}?;
+      )?;
       return Ok(());
    }
 }

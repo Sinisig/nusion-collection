@@ -17,20 +17,20 @@ pub enum ProcessError {
    Unknown,
 }
 
-/// A Result type with Err variant
-/// ProcessError.
+/// Result type with error variant
+/// <code>ProcessError</code>.
 pub type Result<T> = std::result::Result<T, ProcessError>;
 
 /// A snapshot of a process and its
 /// information.
 pub struct ProcessSnapshot {
-   os_snapshot : crate::os::process::ProcessSnapshot,
+   snapshot : crate::os::process::ProcessSnapshot,
 }
 
 /// A snapshot of a module within
 /// a given process snapshot.
 pub struct ModuleSnapshot {
-   os_snapshot : crate::os::process::ModuleSnapshot,
+   snapshot : crate::os::process::ModuleSnapshot,
 }
 
 //////////////////////////////////////////////////
@@ -44,7 +44,7 @@ impl std::fmt::Display for ProcessError {
    ) -> std::fmt::Result {
       return write!(stream, "{}", match self {
          Self::BadExecutableFileName
-            => "Process executable file name contains invalid UTF-8",
+            => "Associated executable file name contains invalid UTF-8",
          Self::Unknown
             => "Unknown error",
       });
@@ -66,7 +66,7 @@ impl ProcessSnapshot {
    ) -> Result<Vec<Self>> {
       let list = crate::os::process::ProcessSnapshot::all()?;
       let list = list.into_iter().map(|snap| {
-         Self{ os_snapshot : snap }
+         Self{snapshot : snap}
       }).collect();
 
       return Ok(list);
@@ -79,12 +79,13 @@ impl ProcessSnapshot {
    pub fn local(
    ) -> Result<Self> {
       return Ok(Self{
-         os_snapshot : crate::os::process::ProcessSnapshot::local()?,
+         snapshot : crate::os::process::ProcessSnapshot::local()?,
       });
    }
 
-   /// Enumerates all modules within the
-   /// given process.
+   /// Enumerates all modules within
+   /// the process.  This is equivalent
+   /// to <code><ModuleSnapshot::all_within(self)</code>.
    pub fn modules<'l>(
       &'l self,
    ) -> Result<Vec<ModuleSnapshot>> {
@@ -99,7 +100,7 @@ impl ProcessSnapshot {
    pub fn executable_file_name<'l>(
       &'l self,
    ) -> &'l str {
-      return self.os_snapshot.executable_file_name();
+      return &self.snapshot.executable_name;
    }
 }
 
@@ -109,25 +110,30 @@ impl ProcessSnapshot {
 
 impl ModuleSnapshot {
    /// Creates a snapshot of every module
-   /// within a given process.
+   /// within a given process.  This is
+   /// equivalent to <code>ProcessSnapshot::modules(self)</code>.
    pub fn all_within(
       parent_process : & ProcessSnapshot
    ) -> Result<Vec<Self>> {
-      let list = crate::os::process::ModuleSnapshot::all(&parent_process.os_snapshot)?;
+      let list = crate::os::process::ModuleSnapshot::all(&parent_process.snapshot)?;
       let list = list.into_iter().map(|snap| {
-         Self{ os_snapshot : snap }
+         Self{snapshot : snap}
       }).collect();
 
       return Ok(list);
    }
 
    /// Gets the address range within
-   /// the process occupied by the
-   /// module.
+   /// the process occupied by the module.
+   /// This may or may not be physical or
+   /// virtual memory depending on the
+   /// operating system.  It is the
+   /// memory address range as known
+   /// within the containing process.
    pub fn address_range<'l>(
       &'l self,
    ) -> &'l std::ops::Range<usize> {
-      return self.os_snapshot.address_range();
+      return &self.snapshot.address_range;
    }
 
    /// Retrieves the fil name of the
@@ -138,7 +144,7 @@ impl ModuleSnapshot {
    pub fn executable_file_name<'l>(
       &'l self,
    ) -> &'l str {
-      return self.os_snapshot.executable_file_name();
+      return &self.snapshot.module_name;
    }
 }
 

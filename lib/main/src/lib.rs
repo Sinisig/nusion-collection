@@ -3,10 +3,10 @@
 
 // Internal crate re-exports
 use nusion_proc_macros  as proc_macros;
-use nusion_sys          as sys;
+use nusion_lib_sys      as sys;
 
 // Public-internal module re-exports
-pub use sys::osapi as __osapi;
+pub use sys::__osapi as __osapi;
 
 // Public modules
 pub mod console;

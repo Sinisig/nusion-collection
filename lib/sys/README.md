@@ -1,4 +1,4 @@
-# nusion-sys
+# nusion-lib-sys
 The system abstraction layer backend crate for nusion.
 
 ### Note

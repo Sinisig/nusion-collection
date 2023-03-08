@@ -12,11 +12,17 @@ pub enum ConsoleError {
    Unknown,
 }
 
-/// Result type with Ok variant T and Err variant ConsoleError.
+/// <code>Result</code> type with error
+/// variant <code>ConsoleError</code>.
 pub type Result<T> = std::result::Result<T, ConsoleError>;
 
-/// Stores a handle to the console.
-pub struct Console(crate::os::console::Console);
+/// Creates a console window for displaying
+/// output text from <code>stdout</code> and
+/// <code>stderr</code>.  The console window
+/// does not allow for input.
+pub struct Console {
+   console : crate::os::console::Console,
+}
 
 //////////////////////////////////////////
 // TRAIT IMPLEMENTATIONS - ConsoleError //
@@ -44,12 +50,15 @@ impl std::error::Error for ConsoleError {
 ///////////////////////
 
 impl Console {
-   /// Creates a new console.  If an
-   /// issue occurs such as a console
-   /// already existing, an error is
-   /// returned.
+   /// Creates a new console window.
    pub fn new() -> Result<Self> {
-      return Ok(Self(crate::os::console::Console::new()?));
+      let mut console = crate::os::console::Console::allocate()?;
+
+      console.set_title("unnamed console")?;
+
+      return Ok(Self{
+         console : console,
+      });
    }
 
    /// Copies the window title of the
@@ -57,17 +66,33 @@ impl Console {
    pub fn get_title(
       & self,
    ) -> Result<String> {
-      return Ok(self.0.get_title()?);
+      return Ok(self.console.get_title()?);
    }
 
-   /// Sets the window title of the
-   /// console.
+   /// Sets the console's window title.
    pub fn set_title(
       & mut self,
-      title : & str,
-   ) -> Result<& mut Self> {
-      self.0.set_title(title)?;
-      return Ok(self);
+      new_title : & str,
+   ) -> Result<()> {
+      self.console.set_title(new_title)?;
+      return Ok(());
+   }
+}
+
+/////////////////////////////////////
+// TRAIT IMPLEMENTATIONS - Console //
+/////////////////////////////////////
+
+impl Drop for Console {
+   fn drop(
+      & mut self,
+   ) {
+      crate::os::console::Console::free(
+         & mut self.console,
+      ).expect(
+         "Failed to free console instance",
+      );
+      return;
    }
 }
 

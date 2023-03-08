@@ -242,7 +242,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          address_range,
       )?;
 
-      let bytes = editor.bytes();
+      let bytes = editor.as_bytes();
 
       let item = reader.read_item(bytes)?;
 
@@ -263,7 +263,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          address_range,
       )?;
 
-      let bytes = editor.bytes_mut();
+      let bytes = editor.as_bytes_mut();
 
       let bytes_checksum = crate::patch::Checksum::new(bytes);
       let patch_checksum = writer.checksum();
@@ -294,7 +294,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          address_range,
       )?;
 
-      let bytes = editor.bytes_mut();
+      let bytes = editor.as_bytes_mut();
 
       writer.build_patch(bytes)?;
 
@@ -315,7 +315,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          address_range.clone(),
       )?;
 
-      let bytes = editor.bytes_mut();
+      let bytes = editor.as_bytes_mut();
 
       let bytes_checksum = crate::patch::Checksum::new(bytes);
       let patch_checksum = writer.checksum();
@@ -351,7 +351,7 @@ impl crate::patch::Patch for ModuleSnapshot {
          address_range.clone(),
       )?;
 
-      let bytes = editor.bytes_mut();
+      let bytes = editor.as_bytes_mut();
 
       let container = Self::Container{
          address_range  : address_range,
@@ -376,7 +376,7 @@ impl std::ops::Drop for ModuleSnapshotPatchContainer {
          self.address_range.clone(),
       ).expect("Failed to restore patched module bytes");
 
-      unsafe{editor.bytes_mut().copy_from_slice(&self.old_bytes)};
+      unsafe{editor.as_bytes_mut().copy_from_slice(&self.old_bytes)};
 
       return;
    }
