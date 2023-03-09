@@ -10,13 +10,6 @@
 /// looping.
 pub fn exec_loop(
 ) -> Result<bool, Box<dyn std::error::Error + Send>> {
-   let _test = nusion::asm_bytes!("xor eax,eax");
-   println!("--- ASM Bytes ---");
-   for b in _test {
-      println!("{b}");
-   }
-   println!("-----------------");
-
    println!("Executed loop!");
    return Ok(true);
 }

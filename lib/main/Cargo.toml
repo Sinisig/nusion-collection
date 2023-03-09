@@ -1,5 +1,5 @@
 [package]
-name        = "nusion"
+name        = "nusion-lib"
 description = "General game modding framework and utilites crate."
 authors     = ["Sinisig"]
 version     = "0.3.4+alpha"

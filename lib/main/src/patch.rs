@@ -179,7 +179,7 @@ pub mod writer {
    pub struct Hook {
       pub memory_offset_range : std::ops::Range<usize>,
       pub checksum            : super::Checksum,
-      pub target_hook         : unsafe extern "C" fn(),
+      pub hook                : unsafe extern "C" fn(),
    }
 
    /// Copies a byte buffer containing
@@ -1083,7 +1083,7 @@ impl Writer for writer::Hook {
    ) -> Result<()> {
       crate::sys::compiler::hook_fill(
          memory_buffer,
-         self.target_hook,
+         self.hook,
       )?;
       return Ok(());
    }

@@ -2,7 +2,7 @@
 //! begin of game hooking for the
 //! main loop.
 
-use nusion::patch::Patch;
+use nusion_lib::patch::Patch;
 
 // Globals for sending information to
 // DLL thread from hook
@@ -20,10 +20,10 @@ static ref LOOP_ERROR
 // Hook information which also writes
 // the returned info from the loop to
 // our globals safely.
-const HOOK_LOOP : nusion::patch::writer::Hook = nusion::patch::writer::Hook{
+const HOOK_LOOP : nusion_lib::patch::writer::Hook = nusion_lib::patch::writer::Hook{
    memory_offset_range  : 0x8241BC..0x8241CD,
-   checksum             : nusion::patch::Checksum::from(0xF7946268),
-   target_hook          : nusion::hook!("
+   checksum             : nusion_lib::patch::Checksum::from(0xF7946268),
+   hook                 : nusion_lib::hook!("
       // Store volatiles and align stack
       push  rax
 
@@ -55,10 +55,10 @@ const HOOK_LOOP : nusion::patch::writer::Hook = nusion::patch::writer::Hook{
 
 /// Main entrypoint, this is where
 /// the fun stuff begins!
-#[nusion::main("FSD-Win64-Shipping.exe")]
+#[nusion_lib::main("FSD-Win64-Shipping.exe")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
    // Initialization
-   nusion::env_mut!().console_mut().set_title(
+   nusion_lib::env_mut!().console_mut().set_title(
       "Nusion for Deep Rock Galactic by Sinsig",
    )?;
 
