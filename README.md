@@ -20,6 +20,12 @@ nusion-lib as a dependency.  Never use nusion-lib-sys or
 nusion-lib-proc as dependencies.  These are included as
 backend crates for nusion-lib</b>.
 
+#### game
+Game-specific API implementations will be contained
+within this folder.  They will output a platform-specific
+dynamic library which can be loaded using a dynamic
+library loader.
+
 
 
 ### Build Requirements
