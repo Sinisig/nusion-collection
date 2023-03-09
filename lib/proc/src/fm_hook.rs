@@ -11,7 +11,7 @@ pub fn hook(
 
    // Generate identifiers for the private
    // module, ASM trampoline, and closure
-   const IDENT_PREFIX : &'static str = "__nusion_hook";
+   const IDENT_PREFIX : &'static str = "__nusion_lib_hook";
    let ident = HookIdentifier{
       module      : quote::format_ident!(
          "{IDENT_PREFIX}_{:X}_module",       uuid,
@@ -51,7 +51,6 @@ pub fn hook(
             core::arch::global_asm!(#asm_template);
    
             // Declaration of the assembly function
-            #[no_mangle]
             #[allow(non_snake_case)]
             extern "C" {
                pub fn #asm_template_ident();
@@ -114,7 +113,7 @@ impl HookInput {
       lazy_static::lazy_static!{
          static ref ARG_SEARCHER : regex::Regex = regex::Regex::new(
             r"\{[^\{\}]*?\}"
-         ).expect("Failed to parse Regex, this is a bug");
+         ).expect("Failed to parse Regex! This is a bug in the macro!");
       };
 
       // Substitute template arguments
@@ -123,12 +122,12 @@ impl HookInput {
          HookSubstitutor::new(identifiers, self.asm_template.span()),
       ).into_owned();
 
-      // Add extra assembler metadata
+      // Create the fully-constructed assembly template
+      let label_trampoline = &identifiers.trampoline;
       let output = format!("
-         .section .text
-         {}:
-         {}
-      ", identifiers.trampoline, output);
+         {label_trampoline}:  // Start label for the trampoline
+         {output}             // Previously parsed ASM
+      ");
 
       // Re-construct LitStr and return
       return syn::LitStr::new(&output, self.asm_template.span());

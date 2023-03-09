@@ -6,9 +6,9 @@ version     = "0.3.4+alpha"
 edition     = "2021"
 
 [dependencies]
-nusion-proc-macros   = { path = "../proc" }
-nusion-lib-sys       = { path = "../sys"  }
-lazy_static          = "1.4.0"
-backtrace            = "0.3.67"
-crc                  = "3.0.1"
+nusion-lib-proc   = { path = "../proc" }
+nusion-lib-sys    = { path = "../sys"  }
+lazy_static       = "1.4.0"
+backtrace         = "0.3.67"
+crc               = "3.0.1"
 

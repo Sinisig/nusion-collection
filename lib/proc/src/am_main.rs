@@ -41,7 +41,7 @@ struct EntrypointInfo {
 }
 
 enum EntrypointReturnType {
-   Void,    // (no return type)
+   Void,    // -> () or no return type
    Static,  // -> Result<(), E: std::error::Error>
    Dynamic, // -> Result<(), Box<dyn std::error::Error>>
 }

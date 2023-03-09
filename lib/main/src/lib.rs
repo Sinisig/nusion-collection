@@ -2,8 +2,8 @@
 //! modding framework and utilities crate.
 
 // Internal crate re-exports
-use nusion_proc_macros  as proc_macros;
-use nusion_lib_sys      as sys;
+use nusion_lib_proc  as proc;
+use nusion_lib_sys   as sys;
 
 // Public-internal module re-exports
 pub use sys::__osapi as __osapi;
@@ -16,7 +16,7 @@ pub mod patch;
 pub mod process;
 
 // Public module re-exports
-pub use proc_macros::*;
+pub use proc::*;
 pub use process::{
    ProcessSnapshot,
    ModuleSnapshot,

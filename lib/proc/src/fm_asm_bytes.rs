@@ -8,7 +8,7 @@ pub fn asm_bytes(
    let uuid    = input.generate_uuid();
 
    // Build identifiers based on UUID
-   const IDENT_PREFIX : &'static str = "__nusion_asm_bytes";
+   const IDENT_PREFIX : &'static str = "__nusion_lib_asm_bytes";
    let ident   = AsmBytesIdentifier{
       asm_label_start   : quote::format_ident!(
          "{IDENT_PREFIX}_{:X}_asm_start", uuid,
@@ -41,24 +41,32 @@ pub fn asm_bytes(
             // Assembly bytes code gen
             core::arch::global_asm!(#asm_template);
 
-            // Declarations of pointers
-            #[no_mangle]
+            // Declarations of function pointers
             #[allow(non_snake_case)]
             extern "C" {
-               pub fn #asm_ident_start();
-               pub fn #asm_ident_end();
+               fn #asm_ident_start();
+               fn #asm_ident_end();
             }
+
+            // Byte pointers to the function pointers.
+            // We have to do it this way to force the
+            // compiler to lay the labels next to each
+            // other in memory.  Otherwise, it can re-order
+            // them into memory if they were static variables
+            // and break everything.
+            pub const ASM_START  : * const u8 = #asm_ident_start  as * const u8;
+            pub const ASM_END    : * const u8 = #asm_ident_end    as * const u8;
          }
 
          // Construct the byte slice from the
          // created pointers.  This is the part
-         // which fucks up on older version of
-         // std.
+         // which breaks 'const' on older versions
+         // of the standard library.
          unsafe{std::slice::from_raw_parts(
-            #module_ident::#asm_ident_start as * const u8,
-            (#module_ident::#asm_ident_end as * const u8).offset_from(
-               #module_ident::#asm_ident_start as * const u8,
-            ) as usize,
+            #module_ident::ASM_START,
+            usize::try_from(#module_ident::ASM_END.offset_from(
+               #module_ident::ASM_START,
+            )).expect("ASM end pointer is before start pointer! This is a bug in the macro!"),
          )}
       }
    });
@@ -100,20 +108,21 @@ impl AsmBytesInput {
    ) -> syn::LitStr {
       // All this basically does it append
       // labels and rodata section
-      let asm  = self.asm_template.value();
-      let span = self.asm_template.span();
+      let user_assembly = self.asm_template.value();
+      let label_start   = &identifiers.asm_label_start;
+      let label_end     = &identifiers.asm_label_end;
+      let span          = self.asm_template.span();
+      
 
-      return syn::LitStr::new(&format!(
-         "
-         .section .rodata
-         {}:
-         {}
-         {}:
-         ",
-         identifiers.asm_label_start,
-         asm,
-         identifiers.asm_label_end
-      ), span);
+      return syn::LitStr::new(&format!("
+         .section .rodata        // Mark as non-executable
+
+         {label_start}:          // Start label
+         {user_assembly}         // User's assembly code
+         {label_end}:            // End label
+
+         .section .text          // Restore text section
+      "), span);
    }
 }
 
@@ -129,7 +138,7 @@ impl syn::parse::Parse for AsmBytesInput {
 
       // Create the input and return
       return Ok(Self{
-         asm_template   : asm_template
+         asm_template : asm_template
       });
    }
 }

@@ -154,8 +154,8 @@ dependencies = [
  "backtrace",
  "crc",
  "lazy_static",
+ "nusion-lib-proc",
  "nusion-lib-sys",
- "nusion-proc-macros",
 ]
 
 [[package]]
@@ -167,14 +167,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nusion-lib-sys"
-version = "0.3.4+alpha"
-dependencies = [
- "winapi",
-]
-
-[[package]]
-name = "nusion-proc-macros"
+name = "nusion-lib-proc"
 version = "0.3.4+alpha"
 dependencies = [
  "hashers",
@@ -185,6 +178,13 @@ dependencies = [
  "quote",
  "regex",
  "syn",
+]
+
+[[package]]
+name = "nusion-lib-sys"
+version = "0.3.4+alpha"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
