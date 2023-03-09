@@ -1,4 +1,4 @@
-# nusion
+# nusion-lib
 The main modding library for the Nusion project.
 
 ### Usage
@@ -8,7 +8,7 @@ directory.
 ```
 # Cargo.toml crate dependency example
 [dependencies]
-nusion = { path = "<repository path>/lib/main" }
+nusion-lib = { path = "<repository path>/lib/main" }
 ```
 To write a dynamic library for a specific game, make sure
 to build as a library crate and enable dynamic linking in

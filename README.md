@@ -9,23 +9,16 @@ Each crate has their own readme and documentation.  For more
 information, view the documentation contained inside each
 crate's directory.
 
-#### nusion
-Main game modding library/framework.  All utility functions
-for patching memory, hooking functions, enumerating processes,
-getting base addresses, and more are found in here as high-level
-(relatively) safe abstractions.
-
-#### nusion-sys
-System abstractions used by nusion.
-<b>This should never be used directly as a dependency.</b>
-Instead, you should use the safe(r) high-level wrappers
-found in the nusion library crate.
-
-#### nusion-proc-macros
-Procedural macro implementations incorporated into nusion.
-<b>This should not be used directly as a dependency.</b>
-Instead, you should use the nusion crate, which includes
-this crate bundled with it.
+#### lib
+This is the directory containing all the source code
+for the main modding crate, nusion-lib.  If you are
+writing a modding framework, either use crates.io to
+download the crate or specify "[nusion repository]/lib/main"
+as the dependency path if you are building from the
+downloaded repository.  <b>You should only ever include
+nusion-lib as a dependency.  Never use nusion-lib-sys or
+nusion-lib-proc as dependencies.  These are included as
+backend crates for nusion-lib</b>.
 
 
 

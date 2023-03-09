@@ -36,13 +36,3 @@
    how to define an entrypoint in a shared library
    and patch code.
 
- * Rename nusion crate to nusion-lib.  The term
-   "nusion" should be a general adjective which
-   is used for any project relating to the nusion
-   collection.  For example, "nusion-lib" is the
-   backend game hacking crate.  "nusion-game-drg"
-   is a game hack for Deep Rock Galactic which is
-   tied to this project.  "nusion-loader" will be
-   a shared library loader/injector which is a
-   part of this project.
-
