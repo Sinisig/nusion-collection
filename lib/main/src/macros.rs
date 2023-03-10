@@ -1,39 +1,7 @@
-//! Various convenience macro definitions.
-
-/// Shorthand for nusion::environment::Environment::get().
-#[macro_export]
-macro_rules! env {
-   () => {
-      $crate::environment::Environment::get()
-   };
-}
-
-/// Shorthand for nusion::environment::Environment::get_mut().
-#[macro_export]
-macro_rules! env_mut {
-   () => {
-      $crate::environment::Environment::get_mut()
-   };
-}
-
-/// Shorthand for nusion::environment::Environment::try_get().
-#[macro_export]
-macro_rules! try_env {
-   () => {
-      $crate::environment::Environment::try_get()
-   };
-}
-
-/// Shorthand for nusion::environment::Environment::try_get_mut().
-#[macro_export]
-macro_rules! try_env_mut {
-   () => {
-      $crate::environment::Environment::try_get_mut()
-   };
-}
+//! Various convenience macros.
 
 /// Internal macro, do not use this!
-/// Use the entry attribute macro instead!
+/// Use the <code>main</code> attribute macro instead!
 #[macro_export]
 macro_rules! __build_entry {
    ($entry:ident, void,             $($proc:literal),*)   => {
@@ -63,6 +31,39 @@ macro_rules! __build_entry {
 }
 
 /// Internal macro, do not use this!
-/// Use the entry attribute macro instead!
+/// Use the <code>main</code> attribute macro instead!
 pub use crate::sys::build_entry as __sys_build_entry;
+
+
+/// Shorthand for <code>environment::Environment::get</code>.
+#[macro_export]
+macro_rules! env {
+   () => {
+      $crate::environment::Environment::get()
+   };
+}
+
+/// Shorthand for <code>environment::Environment::get_mut</code>.
+#[macro_export]
+macro_rules! env_mut {
+   () => {
+      $crate::environment::Environment::get_mut()
+   };
+}
+
+/// Shorthand for <code>environment::Environment::try_get</code>.
+#[macro_export]
+macro_rules! try_env {
+   () => {
+      $crate::environment::Environment::try_get()
+   };
+}
+
+/// Shorthand for <code>environment::Environment::try_get_mut</code>.
+#[macro_export]
+macro_rules! try_env_mut {
+   () => {
+      $crate::environment::Environment::try_get_mut()
+   };
+}
 
