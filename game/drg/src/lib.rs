@@ -6,8 +6,8 @@
 /// MODULE PATH ///
 ///////////////////
 
-mod entry;
 mod exec;
+mod init;
 
 ////////////////////////////////
 /// GENERALLY USED UTILITIES ///

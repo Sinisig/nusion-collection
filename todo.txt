@@ -23,3 +23,7 @@
 
  * Improve error messaging in the panic handler
 
+ * Set up a lock/unlock mechanism for module
+   patching to prevent race conditions.  This
+   will require hardware breakpoints.
+
