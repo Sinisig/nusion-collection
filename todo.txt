@@ -1,12 +1,5 @@
      --- Before leaving alpha phase ---
 
- * Perform a general code review.  There
-   is a lot of unsafe{} in here!  Especially
-   the OS abstractions...those are the worst
-   offenders.  I would be VERY suprised if
-   there isn't at least one memory safety
-   bug or stupid mistake causing UB.
-
  * Proper massaging of OS error codes into
    Rust error enums.  Currently, no actual
    errors are returned, only "Unknown"
@@ -23,13 +16,6 @@
    referencing data moved inside the hash map
    so we can return string slices instead of
    making String copies (slow and bad)
-
- * Documentation! Clean up, review, and improve
-   existing documentation and add new documentation.
-   Most importantly, we need examples! Create sample
-   code in the nusion crate root (lib.rs) showing
-   how to define an entrypoint in a shared library
-   and patch code.
 
  * Change nusion-lib Console to be a trait and
    implement the current Console struct on it

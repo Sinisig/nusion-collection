@@ -499,7 +499,9 @@ impl Alignment {
    /// of bytes on either side or
    /// a byte offset count too large
    /// is passed in, an error is
-   /// returned.
+   /// returned.  This will panic
+   /// if the size of <code>T</code>
+   /// is zero
    pub fn padding_count<T>(
       & self,
       buffer_byte_count : usize,
@@ -512,88 +514,68 @@ impl Alignment {
          });
       }
 
-      let byte_pad_count   = buffer_byte_count - insert_byte_count;
-      let element_size     = std::mem::size_of::<T>();
+      let element_byte_size   = std::mem::size_of::<T>();
+      let padding_byte_count  = buffer_byte_count - insert_byte_count;
 
-      let bytes_pad_left   = match self {
+      if element_byte_size == 0 {
+         panic!("Element byte size is zero");
+      }
+
+      let mut bytes_from_left    : Option<usize> = None;
+      let mut bytes_from_right   : Option<usize> = None;
+      match self {
          Self::Left
-            => {
-               0
-            },
-         Self::LeftOffset        {elements}
-            => {
-               let bytes = *elements * element_size;
-               if bytes > byte_pad_count {
-                  return Err(PatchError::OutOfRange{
-                     maximum  : byte_pad_count,
-                     provided : bytes,
-                  });
-               }
-
-               bytes
-            },
-         Self::LeftByteOffset    {bytes   }
-            => {
-               let bytes = *bytes;
-               if bytes > byte_pad_count {
-                  return Err(PatchError::OutOfRange{
-                     maximum  : byte_pad_count,
-                     provided : bytes,
-                  });
-               }
-
-               bytes            
-            },
+            => bytes_from_left   = Some(0),
+         Self::LeftOffset     {elements}
+            => bytes_from_left   = Some(*elements * element_byte_size),
+         Self::LeftByteOffset {bytes}
+            => bytes_from_left   = Some(*bytes),
          Self::Right
-            => {
-               byte_pad_count
-            },
-         Self::RightOffset       {elements}
-            => {
-               let bytes = *elements * element_size;
-               if bytes > byte_pad_count {
-                  return Err(PatchError::OutOfRange{
-                     maximum  : byte_pad_count,
-                     provided : bytes,
-                  });
-               }
-
-               byte_pad_count - bytes
-            },
-         Self::RightByteOffset   {bytes   }
-            => {
-               let bytes = *bytes;
-               if bytes > byte_pad_count {
-                  return Err(PatchError::OutOfRange{
-                     maximum  : byte_pad_count,
-                     provided : bytes,
-                  });
-               }
-
-               byte_pad_count - bytes
-            },
+            => bytes_from_right  = Some(0),
+         Self::RightOffset    {elements}
+            => bytes_from_right  = Some(*elements * element_byte_size),
+         Self::RightByteOffset{bytes}
+            => bytes_from_right  = Some(*bytes),
          Self::Center
-            => {
-               element_size * ((byte_pad_count / 2) / element_size)
-            },
+            => bytes_from_left   = Some(0),
          Self::CenterByte
-            => {
-               byte_pad_count / 2
-            },
-      };
-      let bytes_pad_right  = byte_pad_count - bytes_pad_left;
+            => bytes_from_right  = Some(buffer_byte_count / 2),
+      }
 
-      let bytes_residual_left    = bytes_pad_left  % element_size;
-      let bytes_residual_right   = bytes_pad_right % element_size;
-      if bytes_residual_left != 0 || bytes_residual_right != 0 {
+      let mut bytes_left   : usize = 0;
+      let mut bytes_right  : usize = 0;
+      if let Some(bytes_from_left)  = bytes_from_left {
+         if bytes_from_left > padding_byte_count {
+            return Err(PatchError::OutOfRange{
+               maximum  : padding_byte_count,
+               provided : bytes_from_left,
+            });
+         }
+         bytes_left  = bytes_from_left;
+         bytes_right = padding_byte_count - bytes_from_left;
+      }
+      if let Some(bytes_from_right) = bytes_from_right {
+         if bytes_from_right > padding_byte_count {
+            return Err(PatchError::OutOfRange{
+               maximum  : padding_byte_count,
+               provided : bytes_from_right,
+            });
+         }
+         bytes_left  = padding_byte_count - bytes_from_right;
+         bytes_right = bytes_from_right;
+      }
+
+      let residual_bytes_left    = bytes_left   % element_byte_size;
+      let residual_bytes_right   = bytes_right  % element_byte_size;
+      if residual_bytes_left != 0 || residual_bytes_right != 0 {
          return Err(PatchError::ResidualBytesDouble{
-            left  : bytes_residual_left,
-            right : bytes_residual_right,
+            left  : residual_bytes_left,
+            right : residual_bytes_right,
          });
       }
 
-      let elements_left    = bytes_pad_left  / element_size;
-      let elements_right   = bytes_pad_right / element_size;
+      let elements_left    = bytes_left   / element_byte_size;
+      let elements_right   = bytes_right  / element_byte_size;
 
       return Ok((elements_left, elements_right));
    }
@@ -627,7 +609,7 @@ impl Alignment {
       // Fill left padding
       unsafe{std::slice::from_raw_parts_mut(
          buffer[
-            0..byte_end_left
+            ..byte_end_left
          ].as_ptr() as * mut U,
          pad_count_left,
       )}.fill(value.clone());
@@ -671,7 +653,7 @@ impl Alignment {
          pad_count_right,
       ) = self.padding_count::<U>(
          buffer.len(),
-         slice.len(),
+         slice.len() * size_of_t,
       )?;
  
       let byte_end_left    = pad_count_left * size_of_u;
@@ -680,7 +662,7 @@ impl Alignment {
       // Fill left padding
       unsafe{std::slice::from_raw_parts_mut(
          buffer[
-            0..byte_end_left
+            ..byte_end_left
          ].as_ptr() as * mut U,
          pad_count_left,
       )}.fill(value.clone());
@@ -922,7 +904,13 @@ impl<
       & self,
       memory_buffer : & mut [u8],
    ) -> Result<()> {
-      let residual = memory_buffer.len() % std::mem::size_of::<T>();
+      let item_size = std::mem::size_of::<T>();
+
+      if item_size == 0 {
+         panic!("Item byte length is zero");
+      }
+
+      let residual = memory_buffer.len() % item_size;
 
       if residual != 0 {
          return Err(PatchError::ResidualBytes{
@@ -930,12 +918,12 @@ impl<
          });
       }
 
-      let bytes = unsafe{std::slice::from_raw_parts_mut(
+      let element_buffer = unsafe{std::slice::from_raw_parts_mut(
          memory_buffer.as_mut_ptr() as * mut T,
          memory_buffer.len() / std::mem::size_of::<T>(),
       )};
 
-      bytes.fill(self.item.clone());
+      element_buffer.fill(self.item.clone());
 
       return Ok(());
    }
@@ -1002,19 +990,19 @@ impl<
       & self,
       memory_buffer : & mut [u8],
    ) -> Result<()> {
-      let slice = unsafe{std::slice::from_raw_parts(
+      let bytes = unsafe{std::slice::from_raw_parts(
          self.slice.as_ptr() as * const u8,
          self.slice.len() * std::mem::size_of::<T>(),
       )};
 
-      if memory_buffer.len() != slice.len() {
+      if memory_buffer.len() != bytes.len() {
          return Err(PatchError::LengthMismatch{
-            found    : slice.len(),
+            found    : bytes.len(),
             expected : memory_buffer.len(),
          });
       }
 
-      memory_buffer.clone_from_slice(slice);
+      memory_buffer.clone_from_slice(bytes);
 
       return Ok(());
    }
@@ -1045,6 +1033,12 @@ impl<
       & self,
       memory_buffer : & mut [u8],
    ) -> Result<()> {
+      let item_size = std::mem::size_of::<T>();
+
+      if item_size == 0 {
+         panic!("Item byte length is zero");
+      }
+
       if memory_buffer.len() == 0 {
          return Ok(());
       }
@@ -1053,7 +1047,7 @@ impl<
          return Err(PatchError::ZeroLengthType);
       }
 
-      let slice_len_bytes = self.slice.len() * std::mem::size_of::<T>();
+      let slice_len_bytes = self.slice.len() * item_size;
 
       if memory_buffer.len() % slice_len_bytes != 0 {
          return Err(PatchError::ResidualBytes{
