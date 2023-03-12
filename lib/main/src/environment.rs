@@ -19,15 +19,71 @@ macro_rules! debug_sleep {
    }
 }
 
-///////////////////
-// PANIC HANDLER //
-///////////////////
+/////////////////////////////////
+// ERROR REPORTING AND LOGGING //
+/////////////////////////////////
 
+/// Prints an error report to the
+/// console and writes it to disk
+fn output_error_report(
+   error_report   : & str,
+   file_name      : & str,
+   file_extension : & str,
+) {
+   // Get the time since the Unix Epoch Time
+   // for creating a time stamp for the error
+   // log file.
+   let unix_epoch_elapsed = std::time::SystemTime::now()
+      .duration_since(std::time::SystemTime::UNIX_EPOCH)
+      .unwrap_or(std::time::Duration::from_secs(0))
+      .as_secs();
+
+   // Get the current working directory to
+   // start enumerating the full file path
+   // for the error log.  This is done instead
+   // of using a relative path because since
+   // we may be panicking from the injected
+   // process, it will output the error log
+   // to the game's executable folder, not
+   // the injected library's folder.  This
+   // can lead to lots of confusion.
+   let mut file_path = std::env::current_dir().unwrap_or(
+      std::path::PathBuf::new(),
+   );
+
+   // Append file name, time, and extension
+   file_path.push(std::path::Path::new("temp.bin"));
+   file_path.set_file_name(std::path::Path::new(&format!(
+      "{file_name}-{unix_epoch_elapsed}",
+   )));
+   file_path.set_extension(std::path::Path::new(file_extension));
+
+   // Display the error message in the console
+   eprint!("{error_report}");
+
+   // Display the output path for the error report
+   println!(
+      "Writing error log to \"{}\"...\n",
+      file_path.to_str().unwrap_or("(invalid text)"),
+   );
+
+   // Attempt to write the error log
+   std::fs::write(&file_path, error_report).unwrap_or_else(|e| {
+      eprintln!("Failed to write the error report! {e}");
+      eprintln!("Grumble...grumble...");
+   });
+
+   return;
+}
+
+/// Panic handler hook for printing
+/// the call stack and source code
+/// unwrap location
 fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
    // Error log file output name and extension
-   const ERROR_LOG_FILE_NAME  : &'static str
-      = "nusion-panic-log";
-   const ERROR_LOG_FILE_EXT   : &'static str
+   const ERROR_REPORT_FILE_NAME  : &'static str
+      = "nusion-panic-report";
+   const ERROR_REPORT_FILE_EXT   : &'static str
       = "txt";
    
    // Error log formatting buffer
@@ -126,54 +182,49 @@ fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
    }
    err_buffer += "-----------------------------------\n\n";
 
-   // Get the time since the Unix Epoch Time
-   // for creating a time stamp for the error
-   // log file.
-   let unix_epoch_elapsed = std::time::SystemTime::now()
-      .duration_since(std::time::SystemTime::UNIX_EPOCH)
-      .unwrap_or(std::time::Duration::from_secs(0))
-      .as_secs();
-
-   // Get the current working directory to
-   // start enumerating the full file path
-   // for the error log.  This is done instead
-   // of using a relative path because since
-   // we may be panicking from the injected
-   // process, it will output the error log
-   // to the game's executable folder, not
-   // the injected library's folder.  This
-   // can lead to lots of confusion.
-   let mut err_log_path = std::env::current_dir().unwrap_or(
-      std::path::PathBuf::new(),
+   // Output the error report
+   output_error_report(
+      &err_buffer,
+      ERROR_REPORT_FILE_NAME,
+      ERROR_REPORT_FILE_EXT,
    );
-
-   // Append file name, time, and extension
-   err_log_path.push(std::path::Path::new("temp.bin"));
-   err_log_path.set_file_name(std::path::Path::new(&format!(
-      "{ERROR_LOG_FILE_NAME}-{unix_epoch_elapsed}",
-   )));
-   err_log_path.set_extension(std::path::Path::new(
-      ERROR_LOG_FILE_EXT,
-   ));
-
-   // Write the output error log path, but don't
-   // actually write the file yet
-   err_buffer += &format!(
-      "Writing error log to \"{}\"...\n",
-      err_log_path.to_str().unwrap_or("(invalid text)"),
-   );
-
-   // Display the error message
-   eprint!("{err_buffer}");
-
-   // Attempt to write the error log
-   std::fs::write(&err_log_path, &err_buffer).unwrap_or_else(|e| {
-      eprintln!("Failed to write the error log! {e}");
-      eprintln!("Grumble...grumble...");
-   });
 
    // Sleep in debug builds to give time to
    // analyze the panic
+   debug_sleep!();
+
+   return;
+}
+
+/// Reports an error to the console
+/// and logs to a file.
+pub fn report_error(err : & str) {
+   // Error log file output name and extension
+   const ERROR_REPORT_FILE_NAME  : &'static str
+      = "nusion-error-report";
+   const ERROR_REPORT_FILE_EXT   : &'static str
+      = "txt";
+   
+   // Error log formatting buffer
+   let mut err_buffer = String::new();
+
+   // Initial error message
+   err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+   err_buffer += "!!!       NUSION ERRORED       !!!\n";
+   err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
+
+   // Format the error string 
+   err_buffer += &format!("{err}\n\n");
+
+   // Output the error report
+   output_error_report(
+      &err_buffer,
+      ERROR_REPORT_FILE_NAME,
+      ERROR_REPORT_FILE_EXT,
+   );
+
+   // Sleep in debug builds to give time to
+   // analyze the error
    debug_sleep!();
 
    return;
@@ -200,7 +251,20 @@ pub enum EnvironmentError {
 pub type Result<T> = std::result::Result<T, EnvironmentError>;
 
 /// Struct for storing and managing
-/// environment information.
+/// environment information.  In
+/// debug builds, a separate console
+/// window is created for debugging
+/// purposes.  If <code>main</code>
+/// fails to start, <code>main </code>
+/// returns an error, or at any point
+/// the program panics, an error log
+/// is written inside the game executable's
+/// directory.  In addition, in debug builds
+/// the environment will wait for a brief
+/// period of time before exiting to
+/// give developers a chance to notice
+/// the error or panic and see the output
+/// file path.
 pub struct Environment {
    console  : crate::console::Console,
    process  : crate::process::ProcessSnapshot,
@@ -495,8 +559,7 @@ macro_rules! environment_init {
       match Environment::new() {
          Ok(env)  => env.global_state_init(),
          Err(e)   => {
-            eprintln!   ("Error: Failed to initialize environment: {e}");
-            debug_sleep!();
+            report_error(&format!("Failed to initialize environment: {e}"));
             return crate::sys::environment::OSReturn::FAILURE;
          },
       }
@@ -513,8 +576,7 @@ macro_rules! environment_free {
       std::mem::drop(match Environment::global_state_free() {
          Ok(_)    => (),
          Err(e)   => {
-            eprintln!   ("Error: Failed to free environment: {e}");
-            debug_sleep!();
+            report_error(&format!("Failed to free environment: {e}"));
             return crate::sys::environment::OSReturn::FAILURE;
          },
       })
@@ -533,9 +595,8 @@ macro_rules! check_whitelist {
          let proc = match crate::process::ProcessSnapshot::local() {
             Ok(proc) => proc,
             Err(e)   => {
-               eprintln!         ("Error: Failed to obtain local process: {e}");
-               debug_sleep!      ();
-               environment_free! ();
+               report_error(&format!("Failed to obtain local process: {e}"));
+               environment_free!();
                return crate::sys::environment::OSReturn::FAILURE;
             },
          };
@@ -546,9 +607,8 @@ macro_rules! check_whitelist {
          if $whitelist.iter().find(|cur| {
             cur.eq(&proc)
          }).is_none() == true {
-            eprintln!         ("Error: Entrypoint does not allow binding to \"{proc}\"");
-            debug_sleep!      ();
-            environment_free! ();
+            report_error(&format!("Entrypoint does not allow binding to \"{proc}\""));
+            environment_free!();
             return crate::sys::environment::OSReturn::FAILURE;
          }
       }
@@ -575,9 +635,8 @@ macro_rules! execute_main_void {
 macro_rules! execute_main_result {
    ($identifier:ident) => {
       if let Err(err) = $identifier() {
-         eprintln!         ("Error: {err}");
-         debug_sleep!      ();
-         environment_free! ();
+         report_error(&format!("Main returned an error: {err}"));
+         environment_free!();
          return crate::sys::environment::OSReturn::FAILURE;
       }
    };

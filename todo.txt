@@ -22,7 +22,5 @@
    and rename the struct to something like "OSConsole"
    or "DebugConsole" or something like that.
 
- * Edit the main executor functions to print an
-   error log similar to the panic log when main
-   return an error code
+ * Improve error messaging in the panic handler
 

@@ -22,7 +22,7 @@ static ref LOOP_ERROR
 // our globals safely.
 const HOOK_LOOP : nusion_lib::patch::writer::Hook<std::ops::Range<usize>> = nusion_lib::patch::writer::Hook{
    memory_offset_range  : 0x8241BC..0x8241CD,
-   checksum             : nusion_lib::patch::Checksum::from(0xF7946268),
+   checksum             : nusion_lib::patch::Checksum::from(0),
    hook                 : nusion_lib::hook!("
       // Store volatiles and align stack
       push  rax
