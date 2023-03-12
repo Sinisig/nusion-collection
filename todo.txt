@@ -12,10 +12,9 @@
 
  * Clean up process file to use hashmaps which
    reference strings contained inside a vector.
-   This will partially solve the issue of
-   referencing data moved inside the hash map
-   so we can return string slices instead of
-   making String copies (slow and bad)
+   This is tricky because of lifetime bullshit
+   complaining about "moved" data (that's not
+   really moved)
 
  * Change nusion-lib Console to be a trait and
    implement the current Console struct on it
