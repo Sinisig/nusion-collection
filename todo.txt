@@ -1,10 +1,5 @@
      --- Before leaving alpha phase ---
 
- * Maybe look at abstracting all "private-public"
-   items inside a module named "__private", and
-   then remove all leading underscores from items
-   within this module
-
  * Perform a general code review.  There
    is a lot of unsafe{} in here!  Especially
    the OS abstractions...those are the worst
@@ -35,4 +30,13 @@
    code in the nusion crate root (lib.rs) showing
    how to define an entrypoint in a shared library
    and patch code.
+
+ * Change nusion-lib Console to be a trait and
+   implement the current Console struct on it
+   and rename the struct to something like "OSConsole"
+   or "DebugConsole" or something like that.
+
+ * Edit the main executor functions to print an
+   error log similar to the panic log when main
+   return an error code
 

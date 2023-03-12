@@ -1,6 +1,5 @@
-//! Retrieve information about running
-//! processes and create a snapshot of
-//! processes and their loaded libraries.
+//! Enumerate information about running
+//! processes.
 
 use std::collections::hash_map::HashMap;
 use std::ops::RangeBounds;
@@ -9,73 +8,74 @@ use std::ops::RangeBounds;
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// An error enum containing the
-/// reason behind a process function
-/// failing.
+/// An error relating to a process
+/// or module function failing.
 #[derive(Debug)]
 pub enum ProcessError {
    BadExecutableFileName,
    Unknown,
 }
 
-/// A Result type with Err variant
-/// ProcessError
+/// <code>Result</code> type with error
+/// variant <code>ProcessError</code>.
 pub type Result<T> = std::result::Result<T, ProcessError>;
 
-/// A snapshot of various information
-/// about a process.
+/// A snapshot of a process' information.
+/// If the process exits while the snapshot
+/// is in use, all functions acting on the
+/// process itself and not just the snapshot
+/// will return an error.
 pub struct ProcessSnapshot {
-   snap  : crate::sys::process::ProcessSnapshot,
+   snapshot : crate::sys::process::ProcessSnapshot,
 }
 
-/// A snapshot of a loaded library
-/// or executable within a process.
+/// A snapshot of a module loaded
+/// within a process such as a
+/// dynamically loaded library.
+/// If the module unloads while the
+/// snapshot is in use, all functions
+/// acting on the process itself and not
+/// just the snapshot will return an
+/// error.
 pub struct ModuleSnapshot {
-   snap  : crate::sys::process::ModuleSnapshot,
+   snapshot : crate::sys::process::ModuleSnapshot,
 }
 
-/// A memory patch acting on a module
-/// snapshot.  Patched bytes are restored
-/// to their original bytes when the
-/// container is dropped.
+/// The container for storing patched
+/// bytes in a module for restoration
+/// when the instance is dropped.
 pub struct ModuleSnapshotPatchContainer {
    address_range  : std::ops::Range<usize>,
    old_bytes      : Vec<u8>,
 }
 
-/// A list of process snapshots.  Useful
-/// for enumerating and searching the
-/// entire system process tree.
+/// A list of process snapshots created
+/// by enumerating the system for running
+/// process information.
 pub struct ProcessSnapshotList {
    processes   : HashMap<String, ProcessSnapshot>,
 }
 
-/// A list of module snapshots from a
-/// process.  Useful for searching for
-/// a specific module within a process.
+/// A list of module snapshots created
+/// by enumerating all modules within
+/// a process snapshot.
 pub struct ModuleSnapshotList {
    parent   : ProcessSnapshot,
    modules  : HashMap<String, ModuleSnapshot>,
 }
 
-/// An iterator over a ProcessSnapshotList.
 pub struct ProcessSnapshotListIterator<'s> {
    iter : std::collections::hash_map::Iter<'s, String, ProcessSnapshot>,
 }
 
-/// An iterator over a ModuleSnapshotList.
 pub struct ModuleSnapshotListIterator<'s> {
    iter : std::collections::hash_map::Iter<'s, String, ModuleSnapshot>,
 }
 
-/// A consuming iterator over a
-/// ProcessSnapshotList.
 pub struct ProcessSnapshotListIntoIterator {
    iter : std::collections::hash_map::IntoValues<String, ProcessSnapshot>,
 }
 
-/// A consuming iterator over a
-/// ModuleSnapshotList.
 pub struct ModuleSnapshotListIntoIterator {
    iter : std::collections::hash_map::IntoValues<String, ModuleSnapshot>,
 }
@@ -125,7 +125,7 @@ impl ProcessSnapshot {
    pub fn local(
    ) -> Result<Self> {
       return Ok(Self{
-         snap : crate::sys::process::ProcessSnapshot::local()?,
+         snapshot : crate::sys::process::ProcessSnapshot::local()?,
       });
    }
 
@@ -138,7 +138,7 @@ impl ProcessSnapshot {
    pub fn executable_file_name<'l>(
       &'l self,
    ) -> &'l str {
-      return self.snap.executable_file_name();
+      return self.snapshot.executable_file_name();
    }
 }
 
@@ -153,7 +153,7 @@ impl ModuleSnapshot {
    pub fn address_range<'l>(
       &'l self,
    ) -> &'l std::ops::Range<usize> {
-      return self.snap.address_range();
+      return self.snapshot.address_range();
    }
 
    /// Gets the file name of the
@@ -164,7 +164,7 @@ impl ModuleSnapshot {
    pub fn executable_file_name<'l>(
       &'l self,
    ) -> &'l str {
-      return self.snap.executable_file_name();
+      return self.snapshot.executable_file_name();
    }
 }
 
@@ -179,45 +179,58 @@ impl ModuleSnapshot {
    ) -> crate::patch::Result<std::ops::Range<usize>>
    where R: RangeBounds<usize>,
    {
-      let base_address  = self.address_range().start;
-      let end_address   = self.address_range().end;
+      let address_start = self.address_range().start;
+      let address_end   = self.address_range().end;
 
       use std::ops::Bound;
-      let lower_bound = match offset_range.start_bound() {
+      let offset_start = match offset_range.start_bound() {
          Bound::Included(b)
-            => base_address + *b,
+            => b.clone(),
          Bound::Excluded(b)
-            => base_address + *b + 1,
+            => b.checked_add(1).ok_or(crate::patch::PatchError::OutOfRange{
+               maximum  : usize::MAX,
+               provided : b.clone(),
+            })?,
          Bound::Unbounded
-            => base_address,
+            => 0,
       };
-      let upper_bound = match offset_range.end_bound() {
+      let offset_end = match offset_range.end_bound() {
          Bound::Included(b)
-            => base_address + *b + 1,
+            => b.checked_add(1).ok_or(crate::patch::PatchError::OutOfRange{
+               maximum  : usize::MAX,
+               provided : b.clone(),
+            })?,
          Bound::Excluded(b)
-            => base_address + *b,
+            => b.clone(),
          Bound::Unbounded
-            => end_address,
+            => address_end - address_start, // Will always be valid
       };
 
-      if lower_bound < base_address {
-         // Should theoretically never trigger because
-         // the compiler ensures non-negative offsets
-         // because of the unsigned type, but do this
-         // just to be safe!
+      let address_target_start = address_start
+         .checked_add(offset_start)
+         .ok_or(crate::patch::PatchError::OutOfRange{
+            maximum  : usize::MAX - address_start,
+            provided : offset_start,
+         })?;
+
+      let address_target_end = address_start
+         .checked_add(offset_end)
+         .ok_or(crate::patch::PatchError::OutOfRange{
+            maximum  : usize::MAX - address_end,
+            provided : offset_end,
+         })?;
+
+      if address_target_end > address_end {
          return Err(crate::patch::PatchError::OutOfRange{
-            maximum  : base_address,
-            provided : lower_bound,
+            maximum  : address_end - address_start,
+            provided : offset_end,
          });
       }
-      if upper_bound > end_address {
-         return Err(crate::patch::PatchError::OutOfRange{
-            maximum  : end_address,
-            provided : upper_bound,
-         });
+      if address_target_end < address_target_start {
+         return Err(crate::patch::PatchError::EndOffsetBeforeStartOffset);
       }
 
-      return Ok(lower_bound..upper_bound);
+      return Ok(address_target_start..address_target_end);
    }
 }
 
@@ -228,14 +241,15 @@ impl ModuleSnapshot {
 impl crate::patch::Patch for ModuleSnapshot {
    type Container = ModuleSnapshotPatchContainer;
 
-   unsafe fn patch_read<R>(
+   unsafe fn patch_read<Rd, Mr>(
       & self,
-      reader : & R,
-   ) -> crate::patch::Result<R::Item>
-   where R: crate::patch::Reader,
+      reader : & Rd,
+   ) -> crate::patch::Result<Rd::Item>
+   where Rd: crate::patch::Reader<Mr>,
+         Mr: RangeBounds<usize>,
    {
       let address_range = self.offset_range_to_address_range(
-         &reader.memory_offset_range(),
+         reader.memory_offset_range(),
       )?;
 
       let editor = crate::sys::memory::MemoryEditor::open_read(
@@ -249,14 +263,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(item);
    }
 
-   unsafe fn patch_write<P>(
+   unsafe fn patch_write<Wt, Mr>(
       & mut self,
-      writer : & P,
+      writer : & Wt,
    ) -> crate::patch::Result<()>
-   where P: crate::patch::Writer,
+   where Wt: crate::patch::Writer<Mr>,
+         Mr: RangeBounds<usize>,
    {
       let address_range = self.offset_range_to_address_range(
-         &writer.memory_offset_range(),
+         writer.memory_offset_range(),
       )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
@@ -268,10 +283,10 @@ impl crate::patch::Patch for ModuleSnapshot {
       let bytes_checksum = crate::patch::Checksum::new(bytes);
       let patch_checksum = writer.checksum();
 
-      if bytes_checksum != patch_checksum {
+      if &bytes_checksum != patch_checksum {
          return Err(crate::patch::PatchError::ChecksumMismatch{
             found    : bytes_checksum,
-            expected : patch_checksum,
+            expected : patch_checksum.clone(),
          });
       }
 
@@ -280,14 +295,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(());
    }
 
-   unsafe fn patch_write_unchecked<P>(
+   unsafe fn patch_write_unchecked<Wt, Mr>(
       & mut self,
-      writer : & P,
+      writer : & Wt,
    ) -> crate::patch::Result<()>
-   where P: crate::patch::Writer,
+   where Wt: crate::patch::Writer<Mr>,
+         Mr: RangeBounds<usize>,
    {
       let address_range = self.offset_range_to_address_range(
-         &writer.memory_offset_range(),
+         writer.memory_offset_range(),
       )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
@@ -301,14 +317,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(());
    }
 
-   unsafe fn patch_create<P>(
+   unsafe fn patch_create<Wt, Mr>(
       & mut self,
-      writer : & P,
+      writer : & Wt,
    ) -> crate::patch::Result<Self::Container>
-   where P: crate::patch::Writer,
+   where Wt: crate::patch::Writer<Mr>,
+         Mr: RangeBounds<usize>,
    {
       let address_range = self.offset_range_to_address_range(
-         &writer.memory_offset_range(),
+         writer.memory_offset_range(),
       )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
@@ -320,10 +337,10 @@ impl crate::patch::Patch for ModuleSnapshot {
       let bytes_checksum = crate::patch::Checksum::new(bytes);
       let patch_checksum = writer.checksum();
 
-      if bytes_checksum != patch_checksum {
+      if &bytes_checksum != patch_checksum {
          return Err(crate::patch::PatchError::ChecksumMismatch{
             found    : bytes_checksum,
-            expected : patch_checksum,
+            expected : patch_checksum.clone(),
          });
       }
 
@@ -337,14 +354,15 @@ impl crate::patch::Patch for ModuleSnapshot {
       return Ok(container);
    }
 
-   unsafe fn patch_create_unchecked<P>(
+   unsafe fn patch_create_unchecked<Wt, Mr>(
       & mut self,
-      writer : & P,
+      writer : & Wt,
    ) -> crate::patch::Result<Self::Container>
-   where P: crate::patch::Writer,
+   where Wt: crate::patch::Writer<Mr>,
+         Mr: RangeBounds<usize>,
    {
       let address_range = self.offset_range_to_address_range(
-         &writer.memory_offset_range(),
+         writer.memory_offset_range(),
       )?;
 
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
@@ -374,7 +392,7 @@ impl std::ops::Drop for ModuleSnapshotPatchContainer {
    ) {
       let mut editor = crate::sys::memory::MemoryEditor::open_read_write(
          self.address_range.clone(),
-      ).expect("Failed to restore patched module bytes");
+      ).expect("Failed to restore patched bytes");
 
       unsafe{editor.as_bytes_mut().copy_from_slice(&self.old_bytes)};
 
@@ -397,8 +415,7 @@ impl ProcessSnapshotList {
    }
 
    /// Creates a snapshot of every
-   /// process visible to the user
-   /// and stores it in the list.
+   /// process visible to the user.
    pub fn all(
    ) -> Result<Self> {
       let proc = crate::sys::process::ProcessSnapshot::all()?;
@@ -406,7 +423,7 @@ impl ProcessSnapshotList {
       let mut hash = HashMap::with_capacity(proc.len());
       for proc in proc {
          let proc = ProcessSnapshot{
-            snap : proc,
+            snapshot : proc,
          };
 
          hash.insert(
@@ -433,10 +450,9 @@ impl ProcessSnapshotList {
       return self;
    }
 
-   /// Removes a process from the
-   /// list by searching for its
-   /// executable file name, returning
-   /// the process snapshot.
+   /// Tries to remove a process from
+   /// the list by its executable file
+   /// name.
    pub fn remove_by_executable_file_name(
       & mut self,
       executable_file_name : & str,
@@ -502,19 +518,18 @@ impl ModuleSnapshotList {
 
    /// Creates a snapshot of every
    /// module within a given process
-   /// snapshot and stores it in the
-   /// list.
+   /// snapshot.
    pub fn all(
       process_snapshot  : ProcessSnapshot,
    ) -> Result<Self> {
       let list = crate::sys::process::ModuleSnapshot::all_within(
-         &process_snapshot.snap,
+         &process_snapshot.snapshot,
       )?;
 
       let mut hash = HashMap::with_capacity(list.len());
       for module in list {
          let module = ModuleSnapshot{
-            snap : module,
+            snapshot : module,
          };
 
          hash.insert(
@@ -542,10 +557,8 @@ impl ModuleSnapshotList {
       return self;
    }
 
-   /// Removes a module from the
-   /// list by searching for its
-   /// executable file name, returning
-   /// the module snapshot.
+   /// Tries to removes a module from the
+   /// list by its executable file name.
    pub fn remove_by_executable_file_name(
       & mut self,
       executable_file_name : & str,
@@ -553,8 +566,8 @@ impl ModuleSnapshotList {
       return self.modules.remove(executable_file_name);
    }
 
-   /// Tries to find a module by
-   /// its executable file name.
+   /// Tries to find a module snapshot
+   /// by its executable file name.
    pub fn find_by_executable_file_name(
       & self,
       executable_file_name : & str,

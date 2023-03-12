@@ -506,9 +506,6 @@
 use nusion_lib_proc  as proc;
 use nusion_lib_sys   as sys;
 
-// Public-internal module re-exports
-pub use sys::__osapi as __osapi;
-
 // Public modules
 pub mod console;
 pub mod environment;
@@ -518,4 +515,21 @@ pub mod process;
 
 // Public module re-exports
 pub use proc::*;
+
+// Public-internal items
+pub mod __private {
+   //! This module should never be used.
+   //! This only exists to allow certain
+   //! macros to function properly.  There
+   //! is no excuse good enough for accessing
+   //! this module in your code, no matter
+   //! what you say.
+   
+   use super::*;
+
+   pub use sys::        __osapi        as osapi;
+   pub use crate::      __build_entry  as build_entry;
+   pub use environment::__start_main   as start_main;
+   pub use sys::        build_entry    as sys_build_entry;
+}
 

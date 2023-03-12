@@ -1,39 +1,33 @@
 //! Various convenience macros.
 
 /// Internal macro, do not use this!
-/// Use the <code>main</code> attribute macro instead!
 #[macro_export]
 macro_rules! __build_entry {
    ($entry:ident, void,             $($proc:literal),*)   => {
-      $crate::macros::__sys_build_entry!(
-         $crate::environment::Environment::__start_main_void,
+      $crate::__private::sys_build_entry!(
+         $crate::__private::start_main::void,
          $entry,
-         $crate::__osapi,
+         $crate::__private::osapi,
          $($proc),*
       );
    };
    ($entry:ident, result_static,    $($proc:literal),*)   => {
-      $crate::macros::__sys_build_entry!(
-         $crate::environment::Environment::__start_main_result_static,
+      $crate::__private::sys_build_entry!(
+         $crate::__private::start_main::result_static,
          $entry,
-         $crate::__osapi,
+         $crate::__private::osapi,
          $($proc),*
       );
    };
    ($entry:ident, result_dynamic,   $($proc:literal),*)   => {
-      $crate::macros::__sys_build_entry!(
-         $crate::environment::Environment::__start_main_result_dynamic,
+      $crate::__private::sys_build_entry!(
+         $crate::__private::start_main::result_dynamic,
          $entry,
-         $crate::__osapi,
+         $crate::__private::osapi,
          $($proc),*
       );
    };
 }
-
-/// Internal macro, do not use this!
-/// Use the <code>main</code> attribute macro instead!
-pub use crate::sys::build_entry as __sys_build_entry;
-
 
 /// Shorthand for <code>environment::Environment::get</code>.
 #[macro_export]

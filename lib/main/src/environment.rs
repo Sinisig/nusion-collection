@@ -1,7 +1,7 @@
-//! Environment initialization and main
-//! thread entrypoint creation.
+//! Access and manage the local process
+//! modules and other tid-bits.
 
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 //////////////////
 // DEBUG MACROS //
@@ -24,13 +24,16 @@ macro_rules! debug_sleep {
 ///////////////////
 
 fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
+   // Error log file output name and extension
    const ERROR_LOG_FILE_NAME  : &'static str
       = "nusion-panic-log";
    const ERROR_LOG_FILE_EXT   : &'static str
       = "txt";
    
+   // Error log formatting buffer
    let mut err_buffer = String::new();
 
+   // Initial panic message
    err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
    err_buffer += "!!!       NUSION PANICKED       !!!\n";
    err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
@@ -41,9 +44,7 @@ fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
       let line = location.line();
       let colm = location.column();
 
-      err_buffer += &format!(
-         "Panicked in {file} at {line},{colm}: "
-      );
+      err_buffer += &format!("Panicked in {file} at {line},{colm}: ");
    } else {
       err_buffer += "(source file information unavaliable): ";
    }
@@ -55,18 +56,21 @@ fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
       err_buffer += "(unable to format error message)\n\n";
    }
 
-   // Format down the entire known call stack
+   // Format the call stack from most to least recent function
    err_buffer += "----------- Call stack ------------\n";
    for frame in backtrace::Backtrace::new().frames().iter() {
+      // Zero-fill character count for the address
       const ADDR_CHARCOUNT : usize
          = std::mem::size_of::<usize>() * 2 + 2;
 
+      // Formats a memory address into a string
       let format_address = |address| {format!(
          "{addr:#0fill$x}",
          addr = address as usize,
          fill = ADDR_CHARCOUNT,
       )};
 
+      // Buffer for the current stack frame
       let mut frame_buffer = String::new();
             
       // If there are no symbols, append a note
@@ -76,34 +80,41 @@ fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
 
       // Iterate for every symbol in the frame
       for sym in frame.symbols() {
+         // Symbol address in memory
          if let Some(addr) = sym.addr() {
             frame_buffer += &format!("{}: ", format_address(addr));
          } else {
             frame_buffer += &format!("{}: ", "?".repeat(ADDR_CHARCOUNT));
          }
 
+         // Symbol's name
          if let Some(name) = sym.name() {
             frame_buffer += &format!("{name} ");
          } else {
             frame_buffer += "(no symbol name)";
          }
 
+         // File containing the symbol
          if let Some(file) = sym.filename() {
             let file = file.to_str().unwrap_or("(bad file path)");
             frame_buffer += &format!("{file} ");
          }
 
+         // Code line containing the symbol
          if let Some(line) = sym.lineno() {
             frame_buffer += &format!("{line},");
          }
 
+         // Code column containing the symbol
          if let Some(colm) = sym.colno() {
             frame_buffer += &format!("{colm}");
          }
 
+         // Enumerate the next symbol
          frame_buffer += "\n";
       }
 
+      // Print the instruction pointer after the call
       frame_buffer += &format!(
          "   Instruction pointer address: {}\n",
          format_address(frame.ip()),
@@ -184,11 +195,11 @@ pub enum EnvironmentError {
    },
 }
 
-/// Result type with Err variant
-/// EnvironmentError.
+/// <code>Result</code> type with error
+/// variant <code>EnvironmentError</code>
 pub type Result<T> = std::result::Result<T, EnvironmentError>;
 
-/// Struct for keeping track of
+/// Struct for storing and managing
 /// environment information.
 pub struct Environment {
    console  : crate::console::Console,
@@ -247,64 +258,75 @@ impl From<crate::process::ProcessError> for EnvironmentError {
    }
 }
 
-////////////////////////////////////
-// INTERNAL METHODS - Environment //
-////////////////////////////////////
+////////////////////////////////
+// GLOBAL STATE - Environment //
+////////////////////////////////
 
 static mut ENVIRONMENT_GLOBAL_STATE
    : Option<Environment>
    = None;
 
 lazy_static::lazy_static!{
-static ref ENVIRONMENT_GLOBAL_STATE_GUARD
-   : Mutex<&'static mut Environment>
-   = Mutex::new(unsafe{ENVIRONMENT_GLOBAL_STATE.as_mut().expect(
-      "Accessed environment before initialization, this is a bug",
+static ref ENVIRONMENT_GLOBAL_STATE_LOCK
+   : RwLock<&'static mut Environment>
+   = RwLock::new(unsafe{ENVIRONMENT_GLOBAL_STATE.as_mut().expect(
+      "Accessed environment before initialization, this is a bug!",
    )});
 }
 
 impl Environment {
-   // Make sure to initialize before accessing
-   // the guard, otherwise the program will
-   // panic.
-   unsafe fn global_state_init(self) {
-      ENVIRONMENT_GLOBAL_STATE = Some(self);
+   fn global_state_lock_mut<'l>(
+   ) -> Result<RwLockWriteGuard<'l, &'static mut Self>> {
+      return Ok(ENVIRONMENT_GLOBAL_STATE_LOCK.write()?);
+   }
+
+   fn global_state_lock<'l>(
+   ) -> Result<RwLockReadGuard<'l, &'static Self>> {
+      let lock = ENVIRONMENT_GLOBAL_STATE_LOCK.read()?;
+
+      // This is fine because we are converting
+      // a mutable reference to an immutable
+      // reference.  The other way around is
+      // never OK.
+      let lock = unsafe{std::mem::transmute::<
+         RwLockReadGuard<'l, &'static mut Self>,
+         RwLockReadGuard<'l, &'static     Self>,
+      >(lock)};
+
+      return Ok(lock);
+   }
+
+   fn global_state_init(self) {
+      // Lack of synchronization is fine
+      // since we only call init once at
+      // the beginning before other threads
+      // can cause monkey business
+
+      if unsafe{ENVIRONMENT_GLOBAL_STATE.is_some()} {
+         panic!("Attempted to initialize environment after it was already initialized, this is a bug!");
+      }
+
+      unsafe{ENVIRONMENT_GLOBAL_STATE = Some(self)};
       return;
    }
 
-   // Don't use the guard after freeing, as this
-   // will leave the mutex guard with a dangling
-   // reference.
-   unsafe fn global_state_free() -> Result<()> {
-      // Done like this to block until every thread
-      // is done accessing the environment.
-      let _guard = ENVIRONMENT_GLOBAL_STATE_GUARD.lock()?;
-      ENVIRONMENT_GLOBAL_STATE = None;
-      return Ok(());
+   fn global_state_free() -> Result<Self> {
+      // Obtain the lock to ensure thread safety
+      let _write_lock = Self::global_state_lock_mut()?;
+
+      let env = unsafe{ENVIRONMENT_GLOBAL_STATE.take()}.expect(
+         "Attempted to free environment after it was already freed, this is a bug!",
+      );
+
+      return Ok(env);
    }
+}
 
-   /// The only safe part of any of this
-   /// global state nonsense.
-   fn global_state_guard<'l>(
-   ) -> Result<MutexGuard<'l, &'static mut Self>> {
-      return Ok(ENVIRONMENT_GLOBAL_STATE_GUARD.lock()?);
-   }
+////////////////////////////////////
+// INTERNAL METHODS - Environemnt //
+////////////////////////////////////
 
-   /// Forcibly casts to a const reference
-   /// Why yes, I program in C
-   fn global_state_ref<'l>(
-   ) -> Result<MutexGuard<'l, &'static Self>> {
-      let guard = Self::global_state_guard()?;
-
-      // Yikes!
-      let guard = unsafe{std::mem::transmute::<
-         MutexGuard<'l, &'static mut   Self>,
-         MutexGuard<'l, &'static       Self>,
-      >(guard)};
-
-      return Ok(guard);
-   }
-
+impl Environment {
    /// Creates a new instance of an
    /// environment
    fn new() -> Result<Self> {
@@ -343,207 +365,12 @@ impl std::ops::Drop for Environment {
 }
 
 //////////////////////////////////
-// MAIN EXECUTORS - Environment //
-//////////////////////////////////
-
-/// Creates a new environment and
-/// initializes the global context
-/// with it, returning from the caller
-/// with OSReturn::FAILURE upon failure.
-/// In debug mode, it will sleep for a
-/// brief period of time before exiting.
-macro_rules! init_environment {
-   () => {
-      match Environment::new() {
-         Ok(env)  => unsafe{env.global_state_init()},
-         Err(e)   => {
-            eprintln!   ("Error: Failed to initialize environment: {e}");
-            debug_sleep!();
-            return crate::sys::environment::OSReturn::FAILURE;
-         },
-      }
-   };
-}
-
-/// Frees the global environment context
-/// and drops it, returning from the caller
-/// with OSReturn::FAILURE upon failure.
-/// In debug mode, it will sleep for a
-/// brief period of time before exiting.
-macro_rules! free_environment {
-   () => {
-      match unsafe{Environment::global_state_free()} {
-         Ok(_)    => (),
-         Err(e)   => {
-            eprintln!   ("Error: Failed to free environment: {e}");
-            debug_sleep!();
-            return crate::sys::environment::OSReturn::FAILURE;
-         },
-      }
-   };
-}
-
-/// Checks the given process whitelist
-/// and makes sure the process name is
-/// contained within the whitelist assuming
-/// a non-empty whitelist.
-macro_rules! check_whitelist {
-   ($whitelist:ident) => {
-      // Make sure there's items
-      if $whitelist.is_empty() == false {
-         // Get the process name
-         let proc = match crate::process::ProcessSnapshot::local() {
-            Ok(proc) => proc,
-            Err(e)   => {
-               eprintln!         ("Error: Failed to obtain local process: {e}");
-               debug_sleep!      ();
-               free_environment! ();
-               return crate::sys::environment::OSReturn::FAILURE;
-            },
-         };
-         let proc = &proc.executable_file_name();
-
-         // Find the process name in the list,
-         // erroring if not found
-         if $whitelist.iter().find(|cur| {
-            cur.eq(&proc)
-         }).is_none() == true {
-            eprintln!         ("Error: Entrypoint does not allow binding to \"{proc}\"");
-            debug_sleep!      ();
-            free_environment! ();
-            return crate::sys::environment::OSReturn::FAILURE;
-         }
-      }
-   }
-}
-
-/// Executes a main-like function
-/// which has no return type.
-macro_rules! execute_main_void {
-   ($identifier:ident) => {
-      $identifier();
-   };
-}
-
-/// Executes a main-like function
-/// which returns a Result value.
-/// If an Err is returned, the
-/// global environment context will
-/// be freed andthe caller will return
-/// OSReturn::FAILURE to the system.
-/// In debug mode, it will sleep
-/// for a brief period of time before
-/// exiting.
-macro_rules! execute_main_result {
-   ($identifier:ident) => {
-      if let Err(err) = $identifier() {
-         eprintln!         ("Error: {err}");
-         debug_sleep!      ();
-         free_environment! ();
-         return crate::sys::environment::OSReturn::FAILURE;
-      }
-   };
-}
-
-impl Environment {
-   /// Initializes the thread environment
-   /// and executes an entrypoint with no
-   /// return type.  If the process name
-   /// does not match any of those in
-   /// process whitelist, an error is returned.
-   /// If the process whitelist is empty,
-   /// this check is ignored.
-   ///
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn __start_main_void<F>(
-      entrypoint        : F,
-      process_whitelist : &[&str],
-   ) -> crate::sys::environment::OSReturn
-   where F: FnOnce(),
-   {
-      init_environment! ();
-      check_whitelist!  (process_whitelist);
-      execute_main_void!(entrypoint);
-      free_environment! ();
-
-      return crate::sys::environment::OSReturn::SUCCESS;
-   }
-
-   /// Initializes the thread environment
-   /// and executes an entrypoint with a
-   /// Result&lt;(), E&gt; return type where E
-   /// implements std::error::Error statically.
-   /// If the process name does not match any
-   /// of those in process whitelist, an error
-   /// is returned. If the process whitelist is
-   /// empty, this check is ignored.
-   ///
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn __start_main_result_static<F, E>(
-      entrypoint        : F,
-      process_whitelist : &[&str],
-   ) -> crate::sys::environment::OSReturn
-   where F: FnOnce() -> std::result::Result<(), E>,
-         E: std::error::Error,
-   {
-      init_environment!    ();
-      check_whitelist!     (process_whitelist);
-      execute_main_result! (entrypoint);
-      free_environment!    ();
-
-      return crate::sys::environment::OSReturn::SUCCESS;
-   }
-
-   /// Initializes the thread environment
-   /// and executes an entrypoint with a
-   /// Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt;
-   /// return type. If the process name
-   /// does not match any of those in
-   /// process whitelist, an error is
-   /// returned. If the process whitelist
-   /// is empty, this check is ignored.
-   ///
-   /// <h2   id=note_environment_start_main_result_static>
-   /// <a href=#note_environment_start_main_result_static>
-   /// Note
-   /// </a></h2>
-   /// This function should never be called directly.
-   /// Instead use the nusion::entry attribute macro
-   /// to register a function as the designated entrypoint.
-   pub fn __start_main_result_dynamic<F>(
-      entrypoint        : F,
-      process_whitelist : &[&str],
-   ) -> crate::sys::environment::OSReturn
-   where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
-   {
-      init_environment!    ();
-      check_whitelist!     (process_whitelist);
-      execute_main_result! (entrypoint);
-      free_environment!    ();
-
-      return crate::sys::environment::OSReturn::SUCCESS;
-   }
-}
-
-//////////////////////////////////
 // PUBLIC METHODS - Environment //
 //////////////////////////////////
 
 impl Environment {
-   /// Gets a handle to the program's
-   /// environment.
+   /// Obtains a lock to the environment
+   /// mutex.
    ///
    /// <h2 id=  environment_get_panics>
    /// <a href=#environment_get_panics>
@@ -553,16 +380,16 @@ impl Environment {
    /// If the function is unable to access
    /// the environment, the program will
    /// panic.  For a non-panicking version,
-   /// use Environment::try_get().
+   /// use <code>try_get</code>.
    pub fn get<'l>(
-   ) -> MutexGuard<'l, &'static Self> {
+   ) -> RwLockReadGuard<'l, &'static Self> {
       return Self::try_get().expect(
          "Failed to access environment",
       );
    }
 
-   /// Gets a mutable handle to the
-   /// program's environment.
+   /// Obtains a mutable lock to the
+   /// environment mutex.
    ///
    /// <h2 id=  environment_get_mut_panics>
    /// <a href=#environment_get_mut_panics>
@@ -572,28 +399,26 @@ impl Environment {
    /// If the function is unable to access
    /// the environment, the program will
    /// panic.  For a non-panicking version,
-   /// use Environment::try_get_mut().
+   /// use <code>try_get_mut</code>.
    pub fn get_mut<'l>(
-   ) -> MutexGuard<'l, &'static mut Self> {
+   ) -> RwLockWriteGuard<'l, &'static mut Self> {
       return Self::try_get_mut().expect(
          "Failed to access mutable environment",
       );
    }
 
-   /// Tries to get a handle to the
-   /// program's environment, returning
-   /// an error upon failure.
+   /// Tries to obtain a lock to the
+   /// environment mutex.
    pub fn try_get<'l>(
-   ) -> Result<MutexGuard<'l, &'static Self>> {
-      return Self::global_state_ref();
+   ) -> Result<RwLockReadGuard<'l, &'static Self>> {
+      return Self::global_state_lock();
    }
 
-   /// Tries to get a mutable handle to
-   /// the program's environment, returning
-   /// an error upon failure.
+   /// Tries to obtain a mutable lock
+   /// to the environment mutex.
    pub fn try_get_mut<'l>(
-   ) -> Result<MutexGuard<'l, &'static mut Self>> {
-      return Self::global_state_guard();
+   ) -> Result<RwLockWriteGuard<'l, &'static mut Self>> {
+      return Self::global_state_lock_mut();
    } 
 
    /// Gets a reference to the stored
@@ -643,7 +468,7 @@ impl Environment {
    /// this function should not be needed
    /// as processes rarely dynamically load
    /// or unload modules after initialization.
-   pub fn refresh_modules(
+   pub fn modules_refresh(
       & mut self,
    ) -> Result<& mut Self> {
       let modules = crate::process::ModuleSnapshotList::all(
@@ -652,6 +477,161 @@ impl Environment {
 
       self.modules = modules;
       return Ok(self);
+   }
+}
+
+////////////////////////////////
+// MAIN STARTER HELPER MACROS //
+////////////////////////////////
+
+/// Creates a new environment and
+/// initializes the global context
+/// with it, returning from the caller
+/// with OSReturn::FAILURE upon failure.
+/// In debug mode, it will sleep for a
+/// brief period of time before exiting.
+macro_rules! environment_init {
+   () => {
+      match Environment::new() {
+         Ok(env)  => env.global_state_init(),
+         Err(e)   => {
+            eprintln!   ("Error: Failed to initialize environment: {e}");
+            debug_sleep!();
+            return crate::sys::environment::OSReturn::FAILURE;
+         },
+      }
+   };
+}
+
+/// Frees the global environment context
+/// and drops it, returning from the caller
+/// with OSReturn::FAILURE upon failure.
+/// In debug mode, it will sleep for a
+/// brief period of time before exiting.
+macro_rules! environment_free {
+   () => {
+      std::mem::drop(match Environment::global_state_free() {
+         Ok(_)    => (),
+         Err(e)   => {
+            eprintln!   ("Error: Failed to free environment: {e}");
+            debug_sleep!();
+            return crate::sys::environment::OSReturn::FAILURE;
+         },
+      })
+   };
+}
+
+/// Checks the given process whitelist
+/// and makes sure the process name is
+/// contained within the whitelist assuming
+/// a non-empty whitelist.
+macro_rules! check_whitelist {
+   ($whitelist:ident) => {
+      // Make sure there's items
+      if $whitelist.is_empty() == false {
+         // Get the process name
+         let proc = match crate::process::ProcessSnapshot::local() {
+            Ok(proc) => proc,
+            Err(e)   => {
+               eprintln!         ("Error: Failed to obtain local process: {e}");
+               debug_sleep!      ();
+               environment_free! ();
+               return crate::sys::environment::OSReturn::FAILURE;
+            },
+         };
+         let proc = &proc.executable_file_name();
+
+         // Find the process name in the list,
+         // erroring if not found
+         if $whitelist.iter().find(|cur| {
+            cur.eq(&proc)
+         }).is_none() == true {
+            eprintln!         ("Error: Entrypoint does not allow binding to \"{proc}\"");
+            debug_sleep!      ();
+            environment_free! ();
+            return crate::sys::environment::OSReturn::FAILURE;
+         }
+      }
+   }
+}
+
+/// Executes a main-like function
+/// which has no return type.
+macro_rules! execute_main_void {
+   ($identifier:ident) => {
+      $identifier();
+   };
+}
+
+/// Executes a main-like function
+/// which returns a Result value.
+/// If an Err is returned, the
+/// global environment context will
+/// be freed andthe caller will return
+/// OSReturn::FAILURE to the system.
+/// In debug mode, it will sleep
+/// for a brief period of time before
+/// exiting.
+macro_rules! execute_main_result {
+   ($identifier:ident) => {
+      if let Err(err) = $identifier() {
+         eprintln!         ("Error: {err}");
+         debug_sleep!      ();
+         environment_free! ();
+         return crate::sys::environment::OSReturn::FAILURE;
+      }
+   };
+}
+
+///////////////////
+// MAIN STARTERS //
+///////////////////
+
+/// Internal module, do not use this!
+pub mod __start_main {
+   use super::*;
+
+   pub fn void<F>(
+      entrypoint        : F,
+      process_whitelist : &[&str],
+   ) -> crate::sys::environment::OSReturn
+   where F: FnOnce(),
+   {
+      environment_init! ();
+      check_whitelist!  (process_whitelist);
+      execute_main_void!(entrypoint);
+      environment_free! ();
+
+      return crate::sys::environment::OSReturn::SUCCESS;
+   }
+
+   pub fn result_static<F, E>(
+      entrypoint        : F,
+      process_whitelist : &[&str],
+   ) -> crate::sys::environment::OSReturn
+   where F: FnOnce() -> std::result::Result<(), E>,
+         E: std::error::Error,
+   {
+      environment_init!    ();
+      check_whitelist!     (process_whitelist);
+      execute_main_result! (entrypoint);
+      environment_free!    ();
+
+      return crate::sys::environment::OSReturn::SUCCESS;
+   }
+
+   pub fn result_dynamic<F>(
+      entrypoint        : F,
+      process_whitelist : &[&str],
+   ) -> crate::sys::environment::OSReturn
+   where F: FnOnce() -> std::result::Result<(), Box<dyn std::error::Error>>,
+   {
+      environment_init!    ();
+      check_whitelist!     (process_whitelist);
+      execute_main_result! (entrypoint);
+      environment_free!    ();
+
+      return crate::sys::environment::OSReturn::SUCCESS;
    }
 }
 

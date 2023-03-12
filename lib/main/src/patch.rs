@@ -1,12 +1,13 @@
-//! Module containing memory patching
-//! utilities.
+//! Memory patching traits and
+//! implementations.
+
+use std::ops::RangeBounds;
 
 //////////////////////
 // TYPE DEFINITIONS //
 //////////////////////
 
-/// An error type containing the reason
-/// behind a patch creation failing.
+/// An error relating to a patch function.
 #[derive(Debug)]
 pub enum PatchError {
    MemoryError{
@@ -34,19 +35,17 @@ pub enum PatchError {
       maximum     : usize,
       provided    : usize,
    },
+   EndOffsetBeforeStartOffset,
    ZeroLengthType,
 }
 
-/// A result type returned by patch
-/// functions.
+/// <code>Result</code> type with error
+/// variant <code>PatchError</code>
 pub type Result<T> = std::result::Result<T, PatchError>;
 
 /// Enum for representing alignment
 /// of data within a section of memory.
-/// This is useful for specifying where
-/// a byte slice should be positioned
-/// within a larger section of memory.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum Alignment {
    Left,
    LeftOffset{
@@ -73,47 +72,75 @@ pub struct Checksum {
    checksum : u32,
 }
 
-/// Collection of provided patching
-/// struct which implement the
-/// patch::Reader trait.
-pub mod reader {
-   /// Reads a single item which
-   /// implements the Copy trait.
-   #[derive(Debug)]
-   pub struct Item<T: Copy> {
-      pub marker              : std::marker::PhantomData<* const T>,
-      pub memory_offset_range : std::ops::Range<usize>,
-   }
+/// Type which stores a pointer to
+/// a hook function.  The associated
+/// function should be generated with
+/// the <code>hook!</code> macro instead
+/// of manually defining a function.
+type HookTarget = unsafe extern "C" fn();
 
-   /// Reads a slice of items
-   /// which implement the Copy
+/// Collection of provided structs
+/// which implement the <code>Reader</code>
+/// trait for use in <code>Patch</code>
+/// structs.
+pub mod reader {
+   use super::*;
+
+   /// Reads a single item which
+   /// implements the <code>Copy</code>
    /// trait.
    #[derive(Debug)]
-   pub struct Slice<T: Copy> {
+   pub struct Item<
+      R: RangeBounds<usize>,
+      T: Copy,
+   > {
       pub marker              : std::marker::PhantomData<* const T>,
-      pub memory_offset_range : std::ops::Range<usize>,
+      pub memory_offset_range : R,
+   }
+
+   /// Reads a slice of items which
+   /// implement the <code>Copy</code>
+   /// trait.
+   #[derive(Debug)]
+   pub struct Slice<
+      R: RangeBounds<usize>,
+      T: Copy,
+   > {
+      pub marker              : std::marker::PhantomData<* const T>,
+      pub memory_offset_range : R,
       pub element_count       : usize,
    }
 }
 
-/// Collection of provided patching
-/// structs which implement the
-/// patch::Writer trait.
+/// Collection of provided structs
+/// which implement the <code>Writer</code>
+/// trait for use in <code>Patch</code>
+/// structs.
 pub mod writer {
+   use super::*;
+
    /// Clones a single item.
    #[derive(Debug)]
-   pub struct Item<'s, T: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
+   pub struct Item<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
       pub item                : &'s T,
    }
 
    /// Repeatedly clones a single item
    /// to fill the memory buffer.
    #[derive(Debug)]
-   pub struct ItemFill<'s, T: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
+   pub struct ItemFill<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
       pub item                : &'s T,
    }
 
@@ -122,28 +149,41 @@ pub mod writer {
    /// and fills the surrounding bytes
    /// with the cloned padding value.
    #[derive(Debug)]
-   pub struct ItemPadded<'s, T: Clone, U: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
-      pub alignment           : super::Alignment,
+   pub struct ItemPadded<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+      U: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
       pub item                : &'s T,
       pub padding             : &'s U,
    }
 
    /// Clones a single slice.
    #[derive(Debug)]
-   pub struct Slice<'s, T: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
+   pub struct Slice<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
       pub slice               : &'s [T],
    }
 
    /// Repeatedly clones a single slice
    /// to fill the memory buffer.
    #[derive(Debug)]
-   pub struct SliceFill<'s, T: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
+   pub struct SliceFill<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
       pub slice               : &'s [T],
    }
 
@@ -152,10 +192,15 @@ pub mod writer {
    /// and fills the surrounding bytes
    /// with the cloned padding value.
    #[derive(Debug)]
-   pub struct SlicePadded<'s, T: Clone, U: Clone> {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
-      pub alignment           : super::Alignment,
+   pub struct SlicePadded<
+      's,
+      R: RangeBounds<usize>,
+      T: Clone,
+      U: Clone,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
       pub slice               : &'s [T],
       pub padding             : &'s U,
    }
@@ -164,22 +209,26 @@ pub mod writer {
    /// no-operation (nop) machine-code
    /// instructions.
    #[derive(Debug)]
-   pub struct Nop {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
+   pub struct Nop<
+      R: RangeBounds<usize>,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
    }
 
    /// Compiles a call to a given assembly
    /// subroutine, filling the rest of the
    /// bytes with architecture-dependent
    /// no-operation (nop) instructions.
-   /// It is recommended to use the hook!()
-   /// macro to generate your target hook.
+   /// It is recommended to use the <code>hook!</code>
+   /// macro to generate your hook.
    #[derive(Debug)]
-   pub struct Hook {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
-      pub hook                : unsafe extern "C" fn(),
+   pub struct Hook<
+      R: RangeBounds<usize>,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
+      pub hook                : HookTarget,
    }
 
    /// Copies a byte buffer containing
@@ -189,13 +238,15 @@ pub mod writer {
    /// bytes are overwritten with
    /// architecture-dependent no-operation
    /// (nop) instructions.  It is recommended
-   /// to use the asm_bytes!() macro to
-   /// generate the byte slice.
+   /// to use the <code>asm_bytes!</code>
+   /// macro to generate the byte slice.
    #[derive(Debug)]
-   pub struct Asm {
-      pub memory_offset_range : std::ops::Range<usize>,
-      pub checksum            : super::Checksum,
-      pub alignment           : super::Alignment,
+   pub struct Asm<
+      R: RangeBounds<usize>,
+   > {
+      pub memory_offset_range : R,
+      pub checksum            : Checksum,
+      pub alignment           : Alignment,
       pub asm_bytes           : &'static [u8],
    }
 }
@@ -207,9 +258,10 @@ pub mod writer {
 /// Opens a region of memory for
 /// patching and applies a patch
 /// using some type implementing
-/// the Patcher trait.  This is
-/// the trait which opens up a
-/// section of memory for patching.
+/// either the <code>Reader</code>
+/// or <code>Writer</code> trait,
+/// depending on whether a reader
+/// or writer function is used.
 ///
 /// <h2 id=  patch_safety>
 /// <a href=#patch_safety>
@@ -220,14 +272,14 @@ pub mod writer {
 /// part of this library.  To put
 /// into perspective, this is about
 /// as unsafe as
-/// <a href=https://doc.rust-lang.org/std/mem/fn.transmute.html>
-/// std::mem::transmute()
-/// </a>, and in many ways even more
+/// <code><a href=
+/// https://doc.rust-lang.org/std/mem/fn.transmute.html>std::mem::transmute
+/// </a></code>, and in many ways even more
 /// unsafe.  In addition to all the
 /// memory safety concerns from transmute,
 /// any of the following will lead
-/// to undefined behavior (usually a
-/// memory access violation crash):
+/// to <b>undefined behavior</b> (usually
+/// a memory access violation crash):
 ///
 /// <ul>
 /// <li>
@@ -263,55 +315,61 @@ pub trait Patch {
    /// patch metadata.  It is recommended
    /// to make this container store the
    /// overwritten byte data and then
-   /// implement the Drop trait to then
-   /// restore the overwritten bytes.
+   /// implement the <code>Drop</code>
+   /// trait to then restore the overwritten
+   /// bytes.
    type Container;
 
    /// Reads the bytes stored in the
    /// memory range and converts them
    /// to their appropriate type using
    /// a reader.
-   unsafe fn patch_read<R>(
+   unsafe fn patch_read<Rd, Mr>(
       & self,
-      reader : & R,
-   ) -> Result<R::Item>
-   where R: Reader;
+      reader : & Rd,
+   ) -> Result<Rd::Item>
+   where Rd: Reader<Mr>,
+         Mr: RangeBounds<usize>;
 
    /// Writes a patch using a patcher
    /// without saving the overwritten
    /// bytes, checking against a checksum.
-   unsafe fn patch_write<W>(
+   unsafe fn patch_write<Wt, Mr>(
       & mut self,
-      writer : & W,
+      writer : & Wt,
    ) -> Result<()>
-   where W: Writer;
+   where Wt: Writer<Mr>,
+         Mr: RangeBounds<usize>;
 
    /// Writes a patch using a writer
    /// without saving the overwritten
    /// bytes.
-   unsafe fn patch_write_unchecked<W>(
+   unsafe fn patch_write_unchecked<Wt, Mr>(
       & mut self,
-      writer : & W,
+      writer : & Wt,
    ) -> Result<()>
-   where W: Writer;
+   where Wt: Writer<Mr>,
+         Mr: RangeBounds<usize>;
 
    /// Creates a patch using a writer,
    /// storing the overwritten bytes in
    /// the specified container.
-   unsafe fn patch_create<W>(
+   unsafe fn patch_create<Wt, Mr>(
       & mut self,
-      writer : & W,
+      writer : & Wt,
    ) -> Result<Self::Container>
-   where W: Writer;
+   where Wt: Writer<Mr>,
+         Mr: RangeBounds<usize>;
 
    /// Creates a patch using a writer,
    /// storing the overwritten bytes in
    /// the specified container.
-   unsafe fn patch_create_unchecked<W>(
+   unsafe fn patch_create_unchecked<Wt, Mr>(
       & mut self,
-      writer : & W,
+      writer : & Wt,
    ) -> Result<Self::Container>
-   where W: Writer;
+   where Wt: Writer<Mr>,
+         Mr: RangeBounds<usize>;
 }
 
 /// Trait for reading byte data from
@@ -319,20 +377,20 @@ pub trait Patch {
 /// the byte data into some useful type.
 /// This is the trait which reads bytes
 /// from memory.
-pub trait Reader {
+pub trait Reader<R: RangeBounds<usize>> {
    /// The item type which is returned
-   /// by <code>read_item()</code>.
+   /// by <code>read_item</code>.
    type Item;
 
    /// Returns the stored memory offset
    /// range in the reader.
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize>;
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R;
 
    /// Reads the byte slice and converts
    /// it to a valid value of type
-   /// Self::Container.
+   /// <code>Self::Container</code>.
    fn read_item(
       & self,
       memory_buffer  : & [u8],
@@ -341,21 +399,20 @@ pub trait Reader {
 
 /// Trait for storing patch metadata
 /// and later applying the patch to
-/// some type implementing the Patch
-/// trait.  This is the trait which
-/// writes bytes to memory.
-pub trait Writer {
+/// some memory buffer.  This is the
+/// trait which writes bytes to memory.
+pub trait Writer<R: RangeBounds<usize>> {
    /// Returns the stored memory offset
    /// range in the writer.
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize>;
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R;
 
    /// Returns the stored checksum
    /// for the writer.
-   fn checksum(
-      & self,
-   ) -> Checksum;
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum;
 
    /// Builds the patch and writes it
    /// to the memory buffer.  The input
@@ -379,20 +436,22 @@ impl std::fmt::Display for PatchError {
       stream : & mut std::fmt::Formatter<'_>,
    ) -> std::fmt::Result {
       return match self {
-         Self::MemoryError          {sys_error,       }
+         Self::MemoryError                {sys_error,       }
             => write!(stream, "Memory error: {sys_error}",                          ),
-         Self::LengthMismatch       {found, expected, }
+         Self::LengthMismatch             {found, expected, }
             => write!(stream, "Length mismatch: Found {found}, expected {expected}",),
-         Self::ResidualBytes        {residual,        }
+         Self::ResidualBytes              {residual,        }
             => write!(stream, "{residual} leftover residual bytes"),
-         Self::ResidualBytesDouble  {left, right,     }
+         Self::ResidualBytesDouble        {left, right,     }
             => write!(stream, "Residual bytes: {left} on left, {right} on right"),
-         Self::CompilationError     {sys_error,       }
+         Self::CompilationError           {sys_error,       }
             => write!(stream, "Compilation error: {sys_error}"),
-         Self::ChecksumMismatch     {found, expected, }
+         Self::ChecksumMismatch           {found, expected, }
             => write!(stream, "Checksum mismatch: Found {found}, expected {expected}"),
-         Self::OutOfRange           {maximum, provided}
+         Self::OutOfRange                 {maximum, provided}
             => write!(stream, "Out of range: Maximum of {maximum} bytes, provided {provided} bytes"),
+         Self::EndOffsetBeforeStartOffset
+            => write!(stream, "End offset is before start offset"),
          Self::ZeroLengthType
             => write!(stream, "Type has zero length for non-zero range length"),
 
@@ -661,7 +720,7 @@ impl Default for Alignment {
 ////////////////////////
 
 impl Checksum {
-   /// Creates a new Checksum from
+   /// Creates a new checksum from
    /// the provided byte data.
    pub fn new(
       data  : & [u8],
@@ -675,7 +734,7 @@ impl Checksum {
       };
    }
 
-   /// Creates a Checksum from an
+   /// Creates a checksum from an
    /// existing checksum value.
    pub const fn from(
       checksum : u32,
@@ -706,13 +765,16 @@ impl std::fmt::Display for Checksum {
 // TRAIT IMPLEMENTATIONS - reader::Item //
 //////////////////////////////////////////
 
-impl<T: Copy> Reader for reader::Item<T> {
+impl<
+   R: RangeBounds<usize>,
+   T: Copy,
+> Reader<R> for reader::Item<R, T> {
    type Item = T;
 
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
    fn read_item(
@@ -744,13 +806,16 @@ impl<T: Copy> Reader for reader::Item<T> {
 // TRAIT IMPLEMENTATIONS - reader::Slice //
 ///////////////////////////////////////////
 
-impl<T: Copy> Reader for reader::Slice<T> {
+impl<
+   R: RangeBounds<usize>,
+   T: Copy,
+> Reader<R> for reader::Slice<R, T> {
    type Item = Vec<T>;
 
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
    fn read_item(
@@ -794,18 +859,22 @@ impl<T: Copy> Reader for reader::Slice<T> {
 // TRAIT IMPLEMENTATIONS - writer::Item //
 //////////////////////////////////////////
 
-impl<'s, T: Clone> Writer for writer::Item<'s, T> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+> Writer<R> for writer::Item<'s, R, T> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
-   }  
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
+   } 
 
    fn build_patch(
       & self,
@@ -832,17 +901,21 @@ impl<'s, T: Clone> Writer for writer::Item<'s, T> {
 // TRAIT IMPLEMENTATIONS - writer::ItemFill //
 //////////////////////////////////////////////
 
-impl<'s, T: Clone> Writer for writer::ItemFill<'s, T> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+> Writer<R> for writer::ItemFill<'s, R, T> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -872,17 +945,22 @@ impl<'s, T: Clone> Writer for writer::ItemFill<'s, T> {
 // TRAIT IMPLEMENTATIONS - writer::ItemPadded //
 ////////////////////////////////////////////////
 
-impl<'s, T: Clone, U: Clone> Writer for writer::ItemPadded<'s, T, U> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+   U: Clone,
+> Writer<R> for writer::ItemPadded<'s, R, T, U> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -903,17 +981,21 @@ impl<'s, T: Clone, U: Clone> Writer for writer::ItemPadded<'s, T, U> {
 // TRAIT IMPLEMENTATIONS - writer::Slice //
 ///////////////////////////////////////////
 
-impl<'s, T: Clone> Writer for writer::Slice<'s, T> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+> Writer<R> for writer::Slice<'s, R, T> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -942,17 +1024,21 @@ impl<'s, T: Clone> Writer for writer::Slice<'s, T> {
 // TRAIT IMPLEMENTATIONS - writer::SliceFill //
 ///////////////////////////////////////////////
 
-impl<'s, T: Clone> Writer for writer::SliceFill<'s, T> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+> Writer<R> for writer::SliceFill<'s, R, T> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -1005,17 +1091,22 @@ impl<'s, T: Clone> Writer for writer::SliceFill<'s, T> {
 // TRAIT IMPLEMENTATIONS - writer::SlicePadded //
 /////////////////////////////////////////////////
 
-impl<'s, T: Clone, U: Clone> Writer for writer::SlicePadded<'s, T, U> {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   's,
+   R: RangeBounds<usize>,
+   T: Clone,
+   U: Clone,
+> Writer<R> for writer::SlicePadded<'s, R, T, U> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -1036,17 +1127,19 @@ impl<'s, T: Clone, U: Clone> Writer for writer::SlicePadded<'s, T, U> {
 // TRAIT IMPLEMENTATIONS - writer::Nop //
 /////////////////////////////////////////
 
-impl Writer for writer::Nop {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   R: RangeBounds<usize>,
+> Writer<R> for writer::Nop<R> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -1064,17 +1157,19 @@ impl Writer for writer::Nop {
 // TRAIT IMPLEMENTATIONS - writer::Hook //
 //////////////////////////////////////////
 
-impl Writer for writer::Hook {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   R: RangeBounds<usize>,
+> Writer<R> for writer::Hook<R> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(
@@ -1093,17 +1188,19 @@ impl Writer for writer::Hook {
 // TRAIT IMPLEMENTATIONS - writer::Asm //
 /////////////////////////////////////////
 
-impl Writer for writer::Asm {
-   fn memory_offset_range(
-      & self,
-   ) -> std::ops::Range<usize> {
-      return self.memory_offset_range.clone();
+impl<
+   R: RangeBounds<usize>,
+> Writer<R> for writer::Asm<R> {
+   fn memory_offset_range<'l>(
+      &'l self,
+   ) -> &'l R {
+      return & self.memory_offset_range;
    }
 
-   fn checksum(
-      & self,
-   ) -> Checksum {
-      return self.checksum.clone();
+   fn checksum<'l>(
+      &'l self,
+   ) -> &'l Checksum {
+      return & self.checksum;
    }  
 
    fn build_patch(

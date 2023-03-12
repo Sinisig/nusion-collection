@@ -12,12 +12,12 @@ pub enum ConsoleError {
    Unknown,
 }
 
-/// A Result type with Err variant ConsoleError.
+/// <code>Result</code> type with error
+/// variant <code>ConsoleError</code>.
 pub type Result<T> = std::result::Result<T, ConsoleError>;
 
-/// A console window for printing
-/// text to using the standard
-/// print macros.
+/// A console window for displaying
+/// standard I/O streams.
 pub struct Console {
    console  : crate::sys::console::Console,
 }
@@ -62,9 +62,7 @@ impl From<crate::sys::console::ConsoleError> for ConsoleError {
 ///////////////////////
 
 impl Console {
-   /// Creates a new console window.
-   /// If creation fails, an error is
-   /// returned.
+   /// Creates a new console.
    pub fn new() -> Result<Self> {
       return Ok(Self{
          console : crate::sys::console::Console::new()?,
@@ -79,7 +77,8 @@ impl Console {
       return Ok(self.console.get_title()?);
    }
 
-   /// Sets the title of the Console.
+   /// Sets the window title of
+   /// the console.
    pub fn set_title(
       & mut self,
       title : & str,
