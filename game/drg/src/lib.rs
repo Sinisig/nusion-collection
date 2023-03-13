@@ -7,7 +7,9 @@
 ///////////////////
 
 mod exec;
+mod features;
 mod init;
+mod input;
 
 ////////////////////////////////
 /// GENERALLY USED UTILITIES ///

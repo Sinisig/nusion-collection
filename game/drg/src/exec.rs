@@ -9,7 +9,8 @@
 /// Stores information about the main
 /// loop and executes the main loop.
 pub struct MainLoop {
-   test_counter : u32,
+   input    : crate::input::InputState,
+   features : crate::features::FeatureState,
 }
 
 /// <code>Result</code> type returned by
@@ -29,8 +30,24 @@ impl MainLoop {
    // Initializes a new main loop.
    pub fn init(
    ) -> Self {
+      println!("--- Welcome to Nusion for Deep Rock Galactic! ---");
+      println!("");
+      println!("This is in the VERY early stages of development,");
+      println!("so everything will be very basic and possibly");
+      println!("unstable.  Nevertheless, here are keybinds for");
+      println!("all the currently available features:");
+      println!("");
+      println!("Exit and unload  - Delete");
+      println!("Flight           - Numpad 1");
+      println!("Infinite ammo    - Numpad 2");
+      println!("No fire delay    - Numpad 3");
+      println!("");
+      println!("-------------------------------------------------");
+      println!("");
+
       return Self{
-         test_counter   : 0,
+         input    : crate::input::InputState::new(),
+         features : crate::features::FeatureState::new(),
       };
    }
 
@@ -40,11 +57,19 @@ impl MainLoop {
    pub fn execute(
       & mut self,
    ) -> Result {
-      println!("Main loop test counter: {}", self.test_counter);
+      // Poll input devices
+      self.input.poll();
 
-      self.test_counter += 1;
+      // Update the feature list based on input
+      // TODO: Create non-panicking version, can't
+      // use '?' because we need the Send trait.
+      match self.features.update(&self.input) {
+         Ok(_)    => (),
+         Err(e)   => eprintln!("{e}"),
+      }
 
-      return Ok(self.test_counter <= 500);
+      // Exit if we are supposed to
+      return Ok(self.input.key_press_exit == false);
    }
 }
 
