@@ -32,7 +32,7 @@ macro_rules! game {
 #[macro_export]
 macro_rules! game_mut {
    () => {
-      nusion_lib::env_mut!()
+      nusion_core::env_mut!()
          .modules_mut()
          .find_mut_by_executable_file_name("FSD-Win64-Shipping.exe")
          .expect("Failed to find game module")

@@ -2,7 +2,7 @@
 //! begin of game hooking for the
 //! main loop.
 
-use nusion_lib::patch::Patch;
+use nusion_core::patch::Patch;
 
 //////////////////////
 // TYPE DEFINITIONS //
@@ -40,11 +40,11 @@ static ref LOOP_STATUS
 // the chance of a race condition since
 // this is applied asynchronously.
 const LOOP_HOOK
-   : nusion_lib::patch::writer::Hook<std::ops::Range<usize>>
-   = nusion_lib::patch::writer::Hook{
+   : nusion_core::patch::writer::Hook<std::ops::Range<usize>>
+   = nusion_core::patch::writer::Hook{
       memory_offset_range  : 0x8241BC..0x8241CD,
-      checksum             : nusion_lib::patch::Checksum::from(0xF7946268),
-      hook                 : nusion_lib::hook!("
+      checksum             : nusion_core::patch::Checksum::from(0xF7946268),
+      hook                 : nusion_core::hook!("
          // Store volatiles and align stack
          push  rax
 
@@ -112,10 +112,10 @@ const LOOP_HOOK
 /// on a separate thread to the main game thread, so
 /// we need synchronization in order to safely read
 /// and write between the main loop hook and this.
-#[nusion_lib::main("FSD-Win64-Shipping.exe")]
+#[nusion_core::main("FSD-Win64-Shipping.exe")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
    // Initialization
-   nusion_lib::env_mut!().console_mut().set_title(
+   nusion_core::env_mut!().console_mut().set_title(
       "Nusion for Deep Rock Galactic by Sinsig",
    )?;
 

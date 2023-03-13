@@ -10,6 +10,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 lazy_static = "1.4.0"
-nusion-lib  = { path = "../../lib/main" }
+nusion-core = { path = "../../lib/nusion-core" }
 inputbot    = "0.5.1"
 

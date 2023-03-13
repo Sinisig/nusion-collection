@@ -1,6 +1,6 @@
 //! Feature management module.
 
-use nusion_lib::patch::Patch;
+use nusion_core::patch::Patch;
 
 //////////////////////
 // TYPE DEFINITIONS //
@@ -15,7 +15,7 @@ pub struct FeatureState {
 
 /// Internal type, represents the state of a
 /// mod, storing the overwritten bytes
-type FeatureContainer = nusion_lib::process::ModuleSnapshotPatchContainer;
+type FeatureContainer = nusion_core::process::ModuleSnapshotPatchContainer;
 
 ////////////////////////////
 // METHODS - FeatureState //
@@ -37,7 +37,7 @@ impl FeatureState {
    pub fn update(
       & mut self,
       input : & crate::input::InputState,
-   ) -> nusion_lib::patch::Result<& mut Self> {
+   ) -> nusion_core::patch::Result<& mut Self> {
       // Helper macros to reduce on typing
       macro_rules! update_feature {
          ($feature:ident, $input:ident, $create:ident, $as_str:literal) => {
@@ -85,20 +85,20 @@ impl FeatureState {
 //////////////
 
 fn feature_flight(
-) -> nusion_lib::patch::Result<Vec<FeatureContainer>> {
+) -> nusion_core::patch::Result<Vec<FeatureContainer>> {
    todo!()
 }
 
 fn feature_infinite_ammo(
-) -> nusion_lib::patch::Result<Vec<FeatureContainer>> {
+) -> nusion_core::patch::Result<Vec<FeatureContainer>> {
    let mut container = Vec::with_capacity(1);
   
    // General weapon ammo shoot
-   container.push(unsafe{crate::game_mut!().patch_create(&nusion_lib::patch::writer::Asm{
+   container.push(unsafe{crate::game_mut!().patch_create(&nusion_core::patch::writer::Asm{
       memory_offset_range  : 0x14D7CDB..0x14D7CF6,
-      checksum             : nusion_lib::patch::Checksum::from(0xF2185EA3),
-      alignment            : nusion_lib::patch::Alignment::Left,
-      asm_bytes            : nusion_lib::asm_bytes!("
+      checksum             : nusion_core::patch::Checksum::from(0xF2185EA3),
+      alignment            : nusion_core::patch::Alignment::Left,
+      asm_bytes            : nusion_core::asm_bytes!("
          // Overwritten instruction, keep this
          mov   qword ptr [rsp+0xB8],r12
 
@@ -111,15 +111,15 @@ fn feature_infinite_ammo(
 }
 
 fn feature_no_fire_delay(
-) -> nusion_lib::patch::Result<Vec<FeatureContainer>> {
+) -> nusion_core::patch::Result<Vec<FeatureContainer>> {
    let mut container = Vec::with_capacity(1);
   
    // General weapon fire cooldown
-   container.push(unsafe{crate::game_mut!().patch_create(&nusion_lib::patch::writer::Asm{
+   container.push(unsafe{crate::game_mut!().patch_create(&nusion_core::patch::writer::Asm{
       memory_offset_range  : 0x14D7D02..0x14D7D1F,
-      checksum             : nusion_lib::patch::Checksum::from(0xA96DA467),
-      alignment            : nusion_lib::patch::Alignment::Left,
-      asm_bytes            : nusion_lib::asm_bytes!("
+      checksum             : nusion_core::patch::Checksum::from(0xA96DA467),
+      alignment            : nusion_core::patch::Alignment::Left,
+      asm_bytes            : nusion_core::asm_bytes!("
          // Overwritten instructions, keep these
          xor   r12d,r12d   // TECHNICALLY should be the lowest 8 bits, but whatever
          mov   byte ptr [r14+0x6C2],02
