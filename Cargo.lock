@@ -285,28 +285,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "nusion-game-drg"
-version = "0.0.1+alpha"
-dependencies = [
- "inputbot",
- "lazy_static",
- "nusion-lib",
-]
-
-[[package]]
-name = "nusion-lib"
-version = "0.4.0+alpha"
+name = "nusion-core"
+version = "0.4.1+alpha"
 dependencies = [
  "backtrace",
  "crc",
  "lazy_static",
- "nusion-lib-proc",
- "nusion-lib-sys",
+ "nusion-core-proc",
+ "nusion-core-sys",
 ]
 
 [[package]]
-name = "nusion-lib-proc"
-version = "0.4.0+alpha"
+name = "nusion-core-proc"
+version = "0.4.1+alpha"
 dependencies = [
  "hashers",
  "lazy_static",
@@ -319,10 +310,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "nusion-lib-sys"
-version = "0.4.0+alpha"
+name = "nusion-core-sys"
+version = "0.4.1+alpha"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "nusion-game-drg"
+version = "0.0.1+alpha"
+dependencies = [
+ "inputbot",
+ "lazy_static",
+ "nusion-core",
 ]
 
 [[package]]
@@ -382,18 +382,18 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.51"
+version = "1.0.52"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d727cae5b39d21da60fa540906919ad737832fe0b1c165da3a34d6548c849d6"
+checksum = "1d0e1ae9e836cc3beddd63db0df682593d7e2d3d891ae8c9083d2113e1744224"
 dependencies = [
  "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.23"
+version = "1.0.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8856d8364d252a14d474036ea1358d63c9e6965c8e5c1885c18f73d70bff9c7b"
+checksum = "4424af4bf778aae2051a77b60283332f386554255d722233d09fbfc7e30da2fc"
 dependencies = [
  "proc-macro2",
 ]
@@ -440,9 +440,9 @@ checksum = "3ab8ed2edee10b50132aed5f331333428b011c99402b5a534154ed15746f9622"
 
 [[package]]
 name = "toml_edit"
-version = "0.19.5"
+version = "0.19.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7082a95d48029677a28f181e5f6422d0c8339ad8396a39d3f33d62a90c1f6c30"
+checksum = "08de71aa0d6e348f070457f85af8bd566e2bc452156a423ddf22861b3a953fae"
 dependencies = [
  "indexmap",
  "toml_datetime",

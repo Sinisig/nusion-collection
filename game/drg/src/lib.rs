@@ -7,7 +7,6 @@
 ///////////////////
 
 mod exec;
-mod features;
 mod init;
 mod input;
 

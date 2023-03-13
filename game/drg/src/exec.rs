@@ -10,7 +10,6 @@
 /// loop and executes the main loop.
 pub struct MainLoop {
    input    : crate::input::InputState,
-   features : crate::features::FeatureState,
 }
 
 /// <code>Result</code> type returned by
@@ -38,16 +37,12 @@ impl MainLoop {
       println!("all the currently available features:");
       println!("");
       println!("Exit and unload  - Delete");
-      println!("Flight           - Numpad 1");
-      println!("Infinite ammo    - Numpad 2");
-      println!("No fire delay    - Numpad 3");
       println!("");
       println!("-------------------------------------------------");
       println!("");
 
       return Self{
-         input    : crate::input::InputState::new(),
-         features : crate::features::FeatureState::new(),
+         input : crate::input::InputState::new(),
       };
    }
 
@@ -59,14 +54,6 @@ impl MainLoop {
    ) -> Result {
       // Poll input devices
       self.input.poll();
-
-      // Update the feature list based on input
-      // TODO: Create non-panicking version, can't
-      // use '?' because we need the Send trait.
-      match self.features.update(&self.input) {
-         Ok(_)    => (),
-         Err(e)   => eprintln!("{e}"),
-      }
 
       // Exit if we are supposed to
       return Ok(self.input.key_press_exit == false);
