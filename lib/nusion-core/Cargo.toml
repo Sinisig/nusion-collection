@@ -1,13 +1,13 @@
 [package]
-name        = "nusion-lib"
+name        = "nusion-core"
 description = "General game modding framework and utilites crate."
 authors     = ["Sinisig"]
-version     = "0.4.0+alpha"
+version     = "0.4.1+alpha"
 edition     = "2021"
 
 [dependencies]
-nusion-lib-proc   = { path = "../proc" }
-nusion-lib-sys    = { path = "../sys"  }
+nusion-core-proc  = { path = "../nusion-core-proc" }
+nusion-core-sys   = { path = "../nusion-core-sys"  }
 lazy_static       = "1.4.0"
 backtrace         = "0.3.67"
 crc               = "3.0.1"

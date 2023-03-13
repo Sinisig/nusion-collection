@@ -11,7 +11,7 @@ pub fn hook(
 
    // Generate identifiers for the private
    // module, ASM trampoline, and closure
-   const IDENT_PREFIX : &'static str = "__nusion_lib_hook";
+   const IDENT_PREFIX : &'static str = "__nusion_core_hook";
    let ident = HookIdentifier{
       module      : quote::format_ident!(
          "{IDENT_PREFIX}_{:X}_module",       uuid,

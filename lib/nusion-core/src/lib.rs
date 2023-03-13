@@ -1,18 +1,18 @@
-//! <h1 id=  nusion_lib>
-//! <a href=#nusion_lib>
+//! <h1 id=  nusion_core>
+//! <a href=#nusion_core>
 //! Nusion Modding Library
 //! </a></h1>
 //! 
 //! Create mods for video games effortlessly
 //! and safely using the power of Rust!
 //!
-//! <h2 id=  nusion_lib_guide>
-//! <a href=#nusion_lib_guide>
+//! <h2 id=  nusion_core_guide>
+//! <a href=#nusion_core_guide>
 //! Introductory guide
 //! </a></h2>
 //!
-//! <h5 id=  nusion_lib_guide_crate_setup>
-//! <a href=#nusion_lib_guide_crate_setup>
+//! <h5 id=  nusion_core_guide_crate_setup>
+//! <a href=#nusion_core_guide_crate_setup>
 //! Crate setup
 //! </a></h5>
 //!
@@ -41,8 +41,8 @@
 //! for Windows or target/\[profile\]/\[name\].so
 //! for Linux.
 //!
-//! <h5 id=  nusion_lib_guide_entrypoint>
-//! <a href=#nusion_lib_guide_entrypoint>
+//! <h5 id=  nusion_core_guide_entrypoint>
+//! <a href=#nusion_core_guide_entrypoint>
 //! Declaring an entrypoint
 //! </a></h5>
 //!
@@ -50,7 +50,7 @@
 //! you know how to do it already!
 //!
 //! ```
-//! #[nusion_lib::main]
+//! #[nusion_core::main]
 //! fn main() {
 //!    println!("Hello, world!");
 //! }
@@ -64,8 +64,8 @@
 //! have a clear project structure where it is
 //! obvious where your entrypoint is declared.
 //!
-//! <h5 id=  nusion_lib_guide_process_filtering>
-//! <a href=#nusion_lib_guide_process_filtering>
+//! <h5 id=  nusion_core_guide_process_filtering>
+//! <a href=#nusion_core_guide_process_filtering>
 //! Only execute when loaded into a specific process
 //! </a></h5>
 //!
@@ -78,7 +78,7 @@
 //! the <code>main</code> attribute macro.
 //!
 //! ```
-//! #[nusion_lib::main("hl2.exe")]
+//! #[nusion_core::main("hl2.exe")]
 //! fn main() {
 //!    println!("Hello, world!");
 //! }
@@ -88,7 +88,7 @@
 //! one process name.
 //!
 //! ```
-//! #[nusion_lib::main("hl2.exe", "csgo.exe", "paint.exe")]
+//! #[nusion_core::main("hl2.exe", "csgo.exe", "paint.exe")]
 //! fn main() {
 //!    println!("Hello, world");
 //! }
@@ -98,8 +98,8 @@
 //! even if the excess definition has a different
 //! process whitelist.
 //!
-//! <h5 id=  nusion_lib_guide_return_errors>
-//! <a href=#nusion_lib_guide_return_errors>
+//! <h5 id=  nusion_core_guide_return_errors>
+//! <a href=#nusion_core_guide_return_errors>
 //! Return errors from your entrypoint
 //! </a></h5>
 //!
@@ -160,8 +160,8 @@
 //! }
 //! ```
 //!
-//! <h5 id=  nusion_lib_guide_environment>
-//! <a href=#nusion_lib_guide_environment>
+//! <h5 id=  nusion_core_guide_environment>
+//! <a href=#nusion_core_guide_environment>
 //! Know your environment
 //! </a></h5>
 //!
@@ -180,13 +180,13 @@
 //! #[nusion::main("hl2.exe")]
 //! fn main() {
 //!    // Change the default console title
-//!    nusion_lib::env_mut!().console_mut().set_title(
+//!    nusion_core::env_mut!().console_mut().set_title(
 //!       "Hello Modding World Console",
 //!    );
 //!
 //!    // Access the module for our target
 //!    // process "hl2.exe"
-//!    let mut game = nusion_lib::env_mut!()
+//!    let mut game = nusion_core::env_mut!()
 //!      .modules_mut()
 //!      .find_by_executable_file_name("hl2.exe")
 //!      .unwrap();  // You should properly handle this in real projects
@@ -204,8 +204,8 @@
 //! the lock as needed instead of holding it
 //! for extended periods of time.
 //!
-//! <h5 id=  nusion_lib_guide_basic_patching>
-//! <a href=#nusion_lib_guide_basic_patching>
+//! <h5 id=  nusion_core_guide_basic_patching>
+//! <a href=#nusion_core_guide_basic_patching>
 //! Read and patch the game's memory
 //! </a></h5>
 //!
@@ -233,32 +233,32 @@
 //! #[nusion::main("hl2.exe")]
 //! fn main() {
 //!    // Our Reader struct for reading the health value
-//!    const READER_HEALTH : nusion_lib::patch::reader::Item<i32> = nusion_lib::patch::reader::Item<i32>{
+//!    const READER_HEALTH : nusion_core::patch::reader::Item<i32> = nusion_lib::patch::reader::Item<i32>{
 //!       marker              : Default::default(),
 //!       memory_offset_range : 0x7FFF1337..0x7FFF133B,
 //!    };
 //!
 //!    // Our Writer struct for writing a new health value
-//!    const WRITER_HEATLH : nusion_lib::patch::writer::Item<'_, i32> = nusion_lib::patch::writer::Item<'_, i32>{
+//!    const WRITER_HEATLH : nusion_core::patch::writer::Item<'_, i32> = nusion_lib::patch::writer::Item<'_, i32>{
 //!       memory_offset_range : 0x7FFF1337..0x7FFF133B,
-//!       checksum            : nusion_lib::patch::Checksum::from(0),
+//!       checksum            : nusion_core::patch::Checksum::from(0),
 //!       item                : &100,
 //!    };
 //!
 //!    // Change the default console title
-//!    nusion_lib::env_mut!().console_mut().set_title(
+//!    nusion_core::env_mut!().console_mut().set_title(
 //!       "Hello Modding World Console",
 //!    );
 //!
 //!    // Access the module for our target
 //!    // process "hl2.exe"
-//!    let mut game = nusion_lib::env_mut!()
+//!    let mut game = nusion_core::env_mut!()
 //!      .modules_mut()
 //!      .find_by_executable_file_name("hl2.exe")
 //!      .unwrap();  // You should properly handle this in real projects
 //!      
 //!    // Import the Patch trait so we can modify process memory
-//!    use nusion_lib::patch::Patch;
+//!    use nusion_core::patch::Patch;
 //!
 //!    // Read the player's current health using the above Reader
 //!    let health = unsafe{game.patch_read(&READER_HEALTH)}?;
@@ -319,8 +319,8 @@
 //! For more information on safety, refer to the
 //! documentation for the <code>Patch</code> trait.
 //!
-//! <h5 id=  nusion_lib_guide_advanced_patching>
-//! <a href=#nusion_lib_guide_advanced_patching>
+//! <h5 id=  nusion_core_guide_advanced_patching>
+//! <a href=#nusion_core_guide_advanced_patching>
 //! Advanced patching
 //! </a></h5>
 //!
@@ -334,10 +334,10 @@
 //! #[nusion::main("hl2.exe")]
 //! fn main() {
 //!    // Our Writer struct for hooking the damage function
-//!    const HOOK_DAMAGE : nusion_lib::patch::writer::Hook = nusion_lib::patch::writer::Hook{ 
+//!    const HOOK_DAMAGE : nusion_core::patch::writer::Hook = nusion_lib::patch::writer::Hook{ 
 //!       memory_offset_range  : 0x9FCD4000..0x9FCD4010,
-//!       checksum             : nusion_lib::patch::Checksum::from(0xFC204AFD),
-//!       hook                 : nusion_lib::hook!("
+//!       checksum             : nusion_core::patch::Checksum::from(0xFC204AFD),
+//!       hook                 : nusion_core::hook!("
 //!          // Execute the instructions the hook overwrote
 //!          mov   edi,[rcx+0x40]
 //!          sub   edi,[rcx+0x44]
@@ -365,19 +365,19 @@
 //!    };
 //!
 //!    // Change the default console title
-//!    nusion_lib::env_mut!().console_mut().set_title(
+//!    nusion_core::env_mut!().console_mut().set_title(
 //!       "Hello Modding World Console",
 //!    );
 //!
 //!    // Access the module for our target
 //!    // process "hl2.exe"
-//!    let mut game = nusion_lib::env_mut!()
+//!    let mut game = nusion_core::env_mut!()
 //!      .modules_mut()
 //!      .find_by_executable_file_name("hl2.exe")
 //!      .unwrap();  // You should properly handle this in real projects
 //!      
 //!    // Import the Patch trait so we can modify process memory
-//!    use nusion_lib::patch::Patch;
+//!    use nusion_core::patch::Patch;
 //!
 //!    // Apply our damage function hook so we can take control
 //!    // We store the overwritten bytes and automatically restore
@@ -438,10 +438,10 @@
 //! #[nusion::main("hl2.exe")]
 //! fn main() {
 //!    // Our Writer struct for patching the damage function
-//!    const ASM_DAMAGE : nusion_lib::patch::writer::Asm = nusion_lib::patch::writer::Asm{ 
+//!    const ASM_DAMAGE : nusion_core::patch::writer::Asm = nusion_lib::patch::writer::Asm{ 
 //!       memory_offset_range  : 0x9FCD4000..0x9FCD4010,
-//!       checksum             : nusion_lib::patch::Checksum::from(0xFC204AFD),
-//!       hook                 : nusion_lib::asm_bytes!("
+//!       checksum             : nusion_core::patch::Checksum::from(0xFC204AFD),
+//!       hook                 : nusion_core::asm_bytes!("
 //!          // Overwrite the damage code and replace
 //!          // with a direct move of 100hp
 //!          mov   [rcx+0x40],100
@@ -449,19 +449,19 @@
 //!    };
 //!
 //!    // Change the default console title
-//!    nusion_lib::env_mut!().console_mut().set_title(
+//!    nusion_core::env_mut!().console_mut().set_title(
 //!       "Hello Modding World Console",
 //!    );
 //!
 //!    // Access the module for our target
 //!    // process "hl2.exe"
-//!    let mut game = nusion_lib::env_mut!()
+//!    let mut game = nusion_core::env_mut!()
 //!      .modules_mut()
 //!      .find_by_executable_file_name("hl2.exe")
 //!      .unwrap();  // You should properly handle this in real projects
 //!      
 //!    // Import the Patch trait so we can modify process memory
-//!    use nusion_lib::patch::Patch;
+//!    use nusion_core::patch::Patch;
 //!
 //!    // Apply our damage function patch to effectively cancel
 //!    // out the damage and lock our health at 100
@@ -487,8 +487,8 @@
 //! cleanliness due to lots of boilerplate to use the
 //! hook method.
 //!
-//! <h5 id=  nusion_lib_guide_conclusion>
-//! <a href=#nusion_lib_guide_conclusion>
+//! <h5 id=  nusion_core_guide_conclusion>
+//! <a href=#nusion_core_guide_conclusion>
 //! Conclusion
 //! </a></h5>
 //!
@@ -503,8 +503,8 @@
 //! will you build?
 
 // Internal crate re-exports
-use nusion_lib_proc  as proc;
-use nusion_lib_sys   as sys;
+use nusion_core_proc as proc;
+use nusion_core_sys  as sys;
 
 // Public modules
 pub mod console;

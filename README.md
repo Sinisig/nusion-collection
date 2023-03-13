@@ -11,14 +11,14 @@ crate's directory.
 
 #### lib
 This is the directory containing all the source code
-for the main modding crate, nusion-lib.  If you are
+for the main modding crate, nusion-core.  If you are
 writing a modding framework, either use crates.io to
-download the crate or specify "[nusion repository]/lib/main"
+download the crate or specify "[nusion repository]/lib/nusion-core"
 as the dependency path if you are building from the
 downloaded repository.  <b>You should only ever include
-nusion-lib as a dependency.  Never use nusion-lib-sys or
-nusion-lib-proc as dependencies.  These are included as
-backend crates for nusion-lib</b>.
+nusion-core as a dependency.  Never use nusion-core-sys or
+nusion-core-proc as dependencies.  These are included as
+backend crates for nusion-core</b>.
 
 #### game
 Game-specific API implementations will be contained

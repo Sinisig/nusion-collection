@@ -8,7 +8,7 @@ pub fn asm_bytes(
    let uuid    = input.generate_uuid();
 
    // Build identifiers based on UUID
-   const IDENT_PREFIX : &'static str = "__nusion_lib_asm_bytes";
+   const IDENT_PREFIX : &'static str = "__nusion_core_asm_bytes";
    let ident   = AsmBytesIdentifier{
       asm_label_start   : quote::format_ident!(
          "{IDENT_PREFIX}_{:X}_asm_start", uuid,

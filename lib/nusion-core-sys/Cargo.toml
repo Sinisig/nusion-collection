@@ -1,8 +1,8 @@
 [package]
-name        = "nusion-lib-sys"
-description = "System abstractions used by nusion."
+name        = "nusion-core-sys"
+description = "System abstractions used by nusion-core."
 authors     = ["Sinisig"]
-version     = "0.4.0+alpha"
+version     = "0.4.1+alpha"
 edition     = "2021"
 
 [target.'cfg(windows)'.dependencies.winapi]

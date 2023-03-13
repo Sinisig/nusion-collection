@@ -21,15 +21,15 @@ pub fn main(
    // to the entrypoint
    return proc_macro::TokenStream::from(match info.variant {
       EntrypointReturnType::Void    => quote::quote! {
-         nusion_lib::__private::build_entry!(#ident, void, #(#allow_list),*);
+         nusion_core::__private::build_entry!(#ident, void, #(#allow_list),*);
          #func
       },
       EntrypointReturnType::Static  => quote::quote! {
-         nusion_lib::__private::build_entry!(#ident, result_static, #(#allow_list),*);
+         nusion_core::__private::build_entry!(#ident, result_static, #(#allow_list),*);
          #func
       },
       EntrypointReturnType::Dynamic => quote::quote! {
-         nusion_lib::__private::build_entry!(#ident, result_dynamic, #(#allow_list),*);
+         nusion_core::__private::build_entry!(#ident, result_dynamic, #(#allow_list),*);
          #func
       },
    });

@@ -1,10 +1,10 @@
-//! Crate root for nusion-proc-macros, a collection
+//! Crate root for nusion-core-proc, a collection
 //! of procedural macros to be incorporated into
-//! nusion.
+//! nusion-core.
 //!
 //! It is not recommended to use this crate directly,
-//! but instead include nusion as a dependency, as
-//! nusion re-exports all macros in this crate.
+//! but instead include nusion-core as a dependency,
+//! as nusion-core re-exports all macros in this crate.
 
 //////////////////////
 // INTERNAL MODULES //

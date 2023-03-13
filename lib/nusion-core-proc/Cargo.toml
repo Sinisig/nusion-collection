@@ -1,8 +1,8 @@
 [package]
-name        = "nusion-lib-proc"
-description = "Procedural macros to be included with nusion-lib"
+name        = "nusion-core-proc"
+description = "Procedural macros to be included with nusion-core"
 authors     = ["Sinisig"]
-version     = "0.4.0+alpha"
+version     = "0.4.1+alpha"
 edition     = "2021"
 
 [lib]
