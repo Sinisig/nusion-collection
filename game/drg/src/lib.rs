@@ -19,9 +19,9 @@ mod input;
 #[macro_export]
 macro_rules! game {
    () => {
-      nusion::env!()
+      nusion_core::env!()
          .modules()
-         .find_by_executable_name("FSD-Win64-Shipping.exe")
+         .find_by_executable_file_name("FSD-Win64-Shipping.exe")
          .expect("Failed to find game module")
    }
 }
