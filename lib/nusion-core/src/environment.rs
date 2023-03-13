@@ -94,23 +94,9 @@ fn panic_handler(panic_info : & std::panic::PanicInfo<'_>) {
    err_buffer += "!!!       NUSION PANICKED       !!!\n";
    err_buffer += "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n\n";
 
-   // Format the location in the source code
-   if let Some(location) = panic_info.location() {
-      let file = location.file();
-      let line = location.line();
-      let colm = location.column();
-
-      err_buffer += &format!("Panicked in {file} at {line},{colm}: ");
-   } else {
-      err_buffer += "(source file information unavaliable): ";
-   }
-
-   // Format the attached payload message
-   if let Some(msg) = panic_info.payload().downcast_ref::<&str>() {
-      err_buffer += &format!("{msg}\n\n");
-   } else {
-      err_buffer += "(unable to format error message)\n\n";
-   }
+   // Use the default formatter to format
+   // the panic info payload
+   err_buffer += &format!("{panic_info}\n\n");
 
    // Format the call stack from most to least recent function
    err_buffer += "----------- Call stack ------------\n";

@@ -21,8 +21,6 @@
    and rename the struct to something like "OSConsole"
    or "DebugConsole" or something like that.
 
- * Improve error messaging in the panic handler
-
  * Set up a lock/unlock mechanism for module
    patching to prevent race conditions.  This
    will require hardware breakpoints.
